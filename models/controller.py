@@ -116,12 +116,12 @@ class Controller(Basic_model):
         # Returns:
         #     action: shape = [dim_action_rl]
         #
-        #lesson_period = [20, 20, 2, 2, 50, 2, 2, 50, 2, 2, 50]
-        #lesson_id     = [0,  1,  3, 4, 2,  3, 4, 2,  3, 4, 2]
-        lesson_period = [100]
-        lesson_id     = [9  ]
-        #lesson_period = [20, 1, 20]
-        #lesson_id     = [0,  3, 1]
+        #lesson_period = [20, 20, 10, 10, 20, 10, 10, 50]
+        #lesson_id     = [0,  1,  3,  4,  2,  3,  4,  2 ]
+        #lesson_period = [100]
+        #lesson_id     = [2  ]
+        lesson_period = [20, 20] + [1] * 3 * 10 + [100]
+        lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
 
         # Ten agents
         #lesson_period = [30] * 9 + [10] * 10 * 8 + [100]
@@ -131,7 +131,6 @@ class Controller(Basic_model):
             ep -= lesson_period[grade]
             grade = min(grade + 1, len(lesson_period)-1)
         return lesson_id[grade]
-
 
     def train_one_step(self, gradBuffer, lr):
         feed_dict = dict(zip(self.gradient_plhs, gradBuffer))

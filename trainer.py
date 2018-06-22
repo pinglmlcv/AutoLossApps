@@ -10,6 +10,7 @@ import sys
 import math
 import socket
 from time import gmtime, strftime
+import time
 
 from models import controller
 from models import two_rooms
@@ -47,55 +48,33 @@ class Trainer():
         #                                       self.sess,
         #                                       exp_name=exp_name+'/agent1')
 
-        # ----three agents----
+        # ----multi agents----
         self.controller = controller.Controller(config, self.sess,
                                                exp_name=exp_name+'/controller')
         self.env_list = []
         self.agent_list = []
-        default_goals = [(2, 1),
-                         (2, 5),
-                         (6, 1),
-                         (6, 5),
-                         (2, 14),
-                         (2, 18),
-                         (6, 14),
-                         (6, 18),
-                         (4, 10)]
-        for goal in default_goals:
+        #optional_goals = [(2, 1),
+        #                  (2, 5),
+        #                  (6, 1),
+        #                  (6, 5),
+        #                  (2, 14),
+        #                  (2, 18),
+        #                  (6, 14),
+        #                  (6, 18),
+        #                  (4, 10)]
+        optional_goals = [(3, 3),
+                          (5, 17)]
+        self.target_agent_id = len(self.agent_list) - 1
+
+        for goal in optional_goals:
             self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
         self.env_list.append(two_rooms.Env2Rooms(config,
-                                                 default_goals=default_goals))
+                                                 optional_goals=optional_goals))
 
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent0'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent1'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent2'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent3'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent4'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent5'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent6'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent7'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent8'))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                                self.sess,
-                                                exp_name=exp_name+'/agent9'))
+        for i in range(len(optional_goals) + 1):
+            self.agent_list.append(gridworld_agent.AgentGridWorld(config,
+                                   self.sess,
+                                   exp_name='{}/agent{}'.format(exp_name, i)))
 
     def train_agent(self, save_model=None, load_model=None):
         config = self.config
@@ -206,7 +185,7 @@ class Trainer():
 
         total_reward = 0
         # ----Running one episode.----
-        for step in range(config.meta.total_steps_distill):
+        for step in range(config.agent.total_steps):
             action = agent_t.run_step(state, epsilon)
             observation, reward, alive = env.update(action)
             total_reward += reward
@@ -244,7 +223,7 @@ class Trainer():
         if agent_s.update_steps % config.agent.synchronize_frequency == 0:
             agent_s.sync_net()
 
-    def train(self, load_model=None, save_model=None):
+    def train(self, load_model=None, save_model=False):
         config = self.config
         controller = self.controller
         replayBufferAgent_list = []
@@ -273,7 +252,7 @@ class Trainer():
             logger.info('=================')
             logger.info('episodes: {}, lesson: {}'.format(ep, lesson))
 
-            if lesson < 10:
+            if lesson <= self.target_agent_id:
                 epsilon = epsilons[min(ep_lesson[lesson],
                                        config.agent.epsilon_decay_steps-1)]
                 self.train_agent_one_ep(self.agent_list[lesson],
@@ -290,37 +269,149 @@ class Trainer():
                 # TODO: For brevity, we use the expert net to sample actions.
                 # Previous study showed that sampling actions from student net
                 # gives a better result, we might try it later.
-                teacher = lesson - 10
-                student = 9
+                teacher = lesson - self.target_agent_id - 1
+                student = self.target_agent_id
                 epsilon = epsilons[min(ep_lesson[teacher] + ep_lesson[lesson],
                                        config.agent.epsilon_decay_steps-1)]
-                self.distill_agent_one_step(self.agent_list[teacher],
+                self.distill_agent_one_ep(self.agent_list[teacher],
                                             self.agent_list[student],
                                             self.env_list[teacher],
                                             replayBufferAgent_list[teacher],
                                             epsilon)
-                #ep_lesson[lesson] += 1
-                #if ep_lesson[lesson] % config.agent.valid_frequency == 0:
-                #    logger.info('++++test agent {}++++'.format(student))
-                #    self.test_agent(self.agent_list[student],
-                #                    self.env_list[student])
-                #    logger.info('++++++++++')
+                ep_lesson[lesson] += 1
+                if ep_lesson[lesson] % config.agent.valid_frequency == 0:
+                    logger.info('++++test agent {}++++'.format(student))
+                    self.test_agent(self.agent_list[student],
+                                    self.env_list[student])
+                    logger.info('++++++++++')
             logger.info('=================')
+
+            if save_model and ep % config.agent.save_frequency == 0:
+                for agent in self.agent_list:
+                    agent.save_model(ep)
+
+    def train_meta(self, load_model=None, save_model=False):
+        config = self.config
+        controller = self.controller
+        replayBufferMeta = replayBuffer(config.meta.buffer_size)
+        # The epsilon decay schedule
+        epsilons = np.linspace(config.agent.epsilon_start,
+                               config.agent.epsilon_end,
+                               config.agent.epsilon_decay_steps)
+        nAgent = self.target_agent_id + 1
+        ema_decay = config.meta.ema_decay
+        for ep_meta in range(config.meta.total_episodes):
+            logger.info('#################')
+            logger.info('meta_episodes: {}'.format(ep_meta))
+            replayBufferAgent_list = []
+            for i in range(len(self.agent_list)):
+                replayBufferAgent_list.append(
+                    replaybuffer.ReplayBuffer(config.agent.buffer_size))
+
+            # ----Initialize agents.----
+            for agent in self.agent_list:
+                agent.initialize_weights()
+            ep_lesson = [0] * (len(self.agent_list) * 2 - 1)
+
+            # ----Initialize performance matrix.----
+            performance_matrix = np.zeros((nAgent, nAgent,
+                                           config.agent.total_episodes + 1))
+            for i in range(nAgent):
+                for j in range(nAgent):
+                    performance_matrix[i, j, 0] = \
+                        self.test_agent(self.agent_list[i], self.env_list[j])
+
+            # ----Start a meta episode.----
+            # curriculum content:
+            #   0: train agent0
+            #   1: train agent1
+            #   2: train agent2
+            #   3: distill from agent0 to agent2
+            #   4: distill from agent1 to agent2
+            for ep in range(config.agent.total_episodes):
+                meta_state = self.get_meta_state(performance_matrix,
+                                                 previous_action)
+                meta_action = controller.run_step(meta_state, ep)
+                lesson = meta_action
+                logger.info('=================')
+                logger.info('episodes: {}, lesson: {}'.format(ep, lesson))
+
+                if lesson < nAgent:
+                    student = lesson
+                    epsilon = epsilons[min(ep_lesson[student],
+                                        config.agent.epsilon_decay_steps-1)]
+                    self.train_agent_one_ep(self.agent_list[student],
+                                            self.env_list[student],
+                                            replayBufferAgent_list[student],
+                                            epsilon)
+                    ep_lesson[student] += 1
+                    #if ep_lesson[student] % config.agent.valid_frequency == 0:
+                    #    logger.info('++++test agent {}++++'.format(student))
+                    #    self.test_agent(self.agent_list[student],
+                    #                    self.env_list[student])
+                    #    logger.info('++++++++++')
+                else:
+                    # TODO: For brevity, we use the expert net to sample actions.
+                    # Previous study showed that sampling actions from student
+                    # net gives a better result, we might try it later.
+                    teacher = lesson - nAgent
+                    student = nAgent - 1
+                    epsilon = epsilons[min(ep_lesson[teacher] + ep_lesson[student],
+                                        config.agent.epsilon_decay_steps-1)]
+                    self.distill_agent_one_ep(self.agent_list[teacher],
+                                                self.agent_list[student],
+                                                self.env_list[teacher],
+                                                replayBufferAgent_list[teacher],
+                                                epsilon)
+                    ep_lesson[student] += 1
+                    #if ep_lesson[student] % config.agent.valid_frequency == 0:
+                    #    logger.info('++++test agent {}++++'.format(student))
+                    #    self.test_agent(self.agent_list[student],
+                    #                    self.env_list[student])
+                    #    logger.info('++++++++++')
+                # ----Update performance matrix.----
+                mask = np.zeros((nAgent, nAgent), dtype=int)
+                mask[student] = 1
+                self.update_performance_matrix(performance_matrix, ep, mask)
+
+                # ----Update lesson probability.----
+                # TODO:
+                self.update_lesson_probability()
+
+                # ----Add transition to meta_buffer.----
+                # TODO:
+
+                # ----End of an agent episode.----
+                logger.info('=================')
+
+            # ----Calculate meta_reward.----
+            # TODO:
+
+            # ----Update controller using PPO.----
+            # TODO:
+
+            # ----End of a meta episode.----
+            logger.info('#################')
+
 
     def test(self, load_model, ckpt_num=None):
         config = self.config
+        agent = self.agent_list[self.target_agent_id]
+        env = self.env_list[self.target_agent_id]
 
-        self.agent.initialize_weights()
-        self.agent.load_model(load_model)
-        self.test_agent(self.agent, self.env)
+        agent.initialize_weights()
+        agent.load_model(load_model)
+        self.test_agent(agent, env)
 
 
-    def test_agent(self, agent, env):
+    def test_agent(self, agent, env, max_episodes=None):
         config = self.config
+        if not max_episodes:
+            max_episodes = config.agent.total_episodes_test
 
         total_reward_aver = 0
         success_rate = 0
-        for ep in range(config.agent.total_episodes_test):
+        for ep in range(max_episodes):
             env.reset_game_art()
             env.set_goal_position()
             env.set_init_position()
@@ -339,8 +430,8 @@ class Trainer():
                     success_rate += 1
                     break
             total_reward_aver += total_reward
-        success_rate /= config.agent.total_episodes_test
-        total_reward_aver /= config.agent.total_episodes_test
+        success_rate /= max_episodes
+        total_reward_aver /= max_episodes
         logger.info('total_reward_aver: {}'.format(total_reward_aver))
         logger.info('success_rate: {}'.format(success_rate))
         return total_reward_aver
@@ -360,6 +451,28 @@ class Trainer():
         self.model_stud.initialize_weights()
         self.model_stud.load_model(load_stud)
         self.model_stud.generate_images(0)
+
+    def update_performance_matrix(self, performance_matrix, ep, mask):
+        # ----Update performance matrix.----
+        #   Using expontional moving average method to update the entries of
+        #   performance matrix masked by `mask`, while the other entries
+        #   remains unchanged. Each entry represent an agent-task pair
+        nAgent, nEnv = mask.shape
+        for i in range(nAgent):
+            for j in range(nEnv):
+                if mask[i, j]:
+                    r = self.test_agent(self.agent_list[i],
+                                        self.env_list[j],
+                                        1)
+                    performance_matrix[i, j, ep + 1] =\
+                        performance_matrix[i, j, ep] * ema_decay\
+                        + r * (1 - ema_decay)
+                else:
+                    performance_matrix[i, j, ep + 1] =\
+                        performance_matrix[i, j, ep]
+
+    def update_lesson_probability(self):
+        pass
 
 
 if __name__ == '__main__':
@@ -383,7 +496,7 @@ if __name__ == '__main__':
         ## ----Testing----
         logger.info('TEST')
         agent_dir = '/datasets/BigLearning/haowen/AutoLossApps/saved_models/'\
-            '{}/agent1'.format(argv[1])
+            '{}/agent2'.format(argv[1])
         trainer.test(agent_dir)
     elif argv[2] == 'baseline':
         # ----Baseline----

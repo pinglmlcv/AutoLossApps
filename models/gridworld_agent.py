@@ -117,7 +117,7 @@ class AgentGridWorld(Basic_model):
         self.train_op = tf.train.AdamOptimizer(self.lr)\
             .minimize(dqn_loss)
 
-        self.distill_op = tf.train.AdamOptimizer(self.lr)\
+        self.distill_op = tf.train.AdamOptimizer(self.lr / 10)\
             .minimize(distill_loss)
 
         self.tvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
@@ -214,9 +214,15 @@ class AgentGridWorld(Basic_model):
 
     def update_distill(self, transition_batch):
         state = transition_batch['state']
+        action = transition_batch['action']
+        reward = transition_batch['reward']
+        next_state = transition_batch['next_state']
         q_expert = transition_batch['q_expert']
-        fetch = [self.distill_op]
+        fetch = [self.distill_op, self.train_op]
         feed_dict = {self.state: state,
+                     self.next_state: next_state,
+                     self.reward: reward,
+                     self.action: action,
                      self.q_expert: q_expert,
                      self.lr: self.config.agent.lr}
         self.sess.run(fetch, feed_dict)

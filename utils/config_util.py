@@ -44,6 +44,7 @@ class Parser(object):
         agent.add('batch_size', self.config.getint('agent', 'batch_size_agent'))
         agent.add('synchronize_frequency', self.config.getint('agent', 'synchronize_frequency_agent'))
         agent.add('valid_frequency', self.config.getint('agent', 'valid_frequency_agent'))
+        agent.add('save_frequency', self.config.getint('agent', 'save_frequency_agent'))
 
         return agent
 
@@ -52,8 +53,8 @@ class Parser(object):
         meta.add('total_episodes', self.config.getint('meta', 'total_episodes_meta'))
         meta.add('distill_mode', self.config.get('meta', 'distill_mode'))
         meta.add('distill_temp', self.config.getfloat('meta', 'distill_temp'))
-        meta.add('total_steps_distill', self.config.getint('meta', 'total_steps_distill'))
-
+        meta.add('buffer_size', self.config.getint('meta', 'buffer_size_meta'))
+        meta.add('ema_decay', self.config.getfloat('meta', 'ema_decay'))
 
         return meta
 

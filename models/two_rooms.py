@@ -105,13 +105,14 @@ class GoalDrape(plab_things.Drape):
 
 
 class Env2Rooms():
-    def __init__(self, config, default_goal=None,
-                 default_goals=None, default_init=None):
+    def __init__(self, config, default_goal=None, optional_goals=None,
+                 default_init=None, optional_inits=None):
         self.config = config
         self.game_art = copy.deepcopy(GAME_ART)
         self.default_goal = default_goal
         self.default_init = default_init
-        self.default_goals = default_goals
+        self.optional_goals = optional_goals
+        self.optional_inits = optional_inits
 
     def init_episode(self, display_flag):
         self.game = make_game(self.game_art)
@@ -127,11 +128,17 @@ class Env2Rooms():
         self.game_art = copy.deepcopy(GAME_ART)
 
     def set_goal_position(self, goal=None):
+        # Three mode to set the goal position,
+        #   1) Specify the goal at run time by using: set_goal_position(goal).
+        #   2) Specify a fixed goal when init the env through default_goal.
+        #   3) Specify a set of optional goals when init the env through
+        #   optional_goals.
+        #   4) Randomly sample a feasible position.
         if not goal:
             if self.default_goal:
                 goal = self.default_goal
             else:
-                goal = self.sample_random_position(self.default_goals)
+                goal = self.sample_random_position(self.optional_goals)
         self.game_art = modify_art(self.game_art, goal, '$')
 
     def set_init_position(self, init=None):
@@ -139,7 +146,7 @@ class Env2Rooms():
             if self.default_init:
                 init = self.default_init
             else:
-                init = self.sample_random_position()
+                init = self.sample_random_position(self.optional_inits)
         self.game_art = modify_art(self.game_art, init, 'P')
 
 
@@ -161,8 +168,8 @@ class Env2Rooms():
                 w = random.randint(0, width-1)
             return (h, w)
         else:
-            i = random.randint(0, len(self.default_goals)-1)
-            return self.default_goals[i]
+            i = random.randint(0, len(optional_position)-1)
+            return optional_position[i]
 
 
 

@@ -194,6 +194,70 @@ def mnist_compare_with_baseline():
     fig.savefig('mnist_{}.pdf'.format(num), transparent = True, bbox_inches = 'tight', pad_inches = 0)
     #fig.savefig(save_dir + '.png', transparent = True, bbox_inches = 'tight', pad_inches = 0)
 
+def gridworld():
+    curves_bl = []
+    for i in range(1, 5):
+        curves_bl.append(np.array(log_utils.read_log_total_reward_aver('../log/log_6_20/three_agent_baseline_0{}.log'.format(i))))
+    curves_at = []
+    for i in range(1, 7):
+        curves_at.append(np.array(log_utils.read_log_total_reward_aver('../log/log_6_20/three_agent_design1_0{}.log'.format(i))))
+
+
+    mean_bl = np.mean(np.array(curves_bl), 0)
+    var_bl = np.std(np.array(curves_bl), 0)
+    x_bl = np.arange(mean_bl.shape[0])
+
+    mean_at = np.mean(np.array(curves_at), 0)
+    var_at = np.std(np.array(curves_at), 0)
+    x_at = np.arange(mean_at.shape[0])
+
+    # Plot code
+    markersize = 9
+    ticksize = 14
+    linewidth = 1.5
+    legendfont = 17
+
+    labelfont = {#'family': 'times',
+            'color':  'black',
+            'weight': 'normal',
+            'size': 19}
+
+    titlefont = {#'family': 'times',
+            'color':  'black',
+            'weight': 'normal',
+            'size': 22,
+            'weight' : 'bold'}
+
+    color = ['b', 'r']
+    label = ['baseline', 'design']
+    fig, ax = plt.subplots()
+    ax.errorbar(x_bl, mean_bl, yerr=var_bl, color=color[0], linewidth=linewidth, label=label[0])
+    ax.errorbar(x_at, mean_at, yerr=var_at, color=color[1], linewidth=linewidth, label=label[1])
+
+    ax.grid(True)
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, loc='upper left', fontsize=legendfont)
+
+    plt.xlabel('Epoch (x10)', fontdict = labelfont)
+    plt.ylabel('$Inception Score (\mathcal{IS})$', fontdict = labelfont)
+    #plt.xticks([0, 10, 20, 30, 40, 50, 60, 70], fontsize = ticksize)
+    #plt.yticks([0, 2, 4, 6, 8, 10], fontsize = ticksize)
+
+    #ax.set_ylim(8.5, 9.1)
+    #ax.set_xlim(0, 8)
+    # set the grid lines to dotted
+    gridlines = ax.get_xgridlines() + ax.get_ygridlines()
+    for line in gridlines:
+        line.set_linestyle('-.')
+
+    # set the line width
+    ticklines = ax.get_xticklines() + ax.get_yticklines()
+    for line in ticklines:
+        line.set_linewidth(5)
+    plt.show()
+    fig.savefig('design.pdf', transparent = True, bbox_inches = 'tight', pad_inches = 0)
+    #fig.savefig(save_dir + '.png', transparent = True, bbox_inches = 'tight', pad_inches = 0)
 if __name__ == '__main__':
     #mnist_compare_with_baseline()
-    mnist_transfer_cifar10()
+    gridworld()
