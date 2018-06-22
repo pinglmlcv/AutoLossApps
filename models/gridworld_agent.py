@@ -200,6 +200,7 @@ class AgentGridWorld(Basic_model):
         logger.info('best_inps: {}'.format(best_inps))
 
     def update(self, transition_batch):
+        self.update_steps += 1
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
@@ -213,6 +214,7 @@ class AgentGridWorld(Basic_model):
         _, pred = self.sess.run(fetch, feed_dict)
 
     def update_distill(self, transition_batch):
+        self.update_steps += 1
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
@@ -243,6 +245,7 @@ class AgentGridWorld(Basic_model):
         feed_dict = {self.state: state}
         q_value = self.sess.run(self.dqn, feed_dict)
         return q_value
+
 
 if __name__ == '__main__':
     root_path = os.path.dirname(os.path.realpath(__file__))

@@ -132,8 +132,5 @@ class Controller(Basic_model):
             grade = min(grade + 1, len(lesson_period)-1)
         return lesson_id[grade]
 
-    def train_one_step(self, gradBuffer, lr):
-        feed_dict = dict(zip(self.gradient_plhs, gradBuffer))
-        feed_dict[self.lr_plh] = lr
-        self.sess.run(self.train_op, feed_dict=feed_dict)
-
+    def update(self, batch):
+        pass
