@@ -32,7 +32,7 @@ def dqn(x, name='dqn'):
         x = tf.layers.flatten(inputs=x, name='flatten')
         out = []
         with tf.variable_scope('fc_block'):
-            units = [256, 128, 8, 4]
+            units = [128, 8, 4]
             for i in range(len(units)):
                 x = tf.layers.dense(inputs=x,
                                     units=units[i],
@@ -44,9 +44,7 @@ def dqn(x, name='dqn'):
 
 class AgentGridWorld(Basic_model):
     def __init__(self, config, sess, exp_name='agent_gridworld'):
-        self.config = config
-        self.exp_name = exp_name
-        self.sess = sess
+        super(AgentGridWorld, self).__init__(config, sess, exp_name)
         self.update_steps = 0
         #TODO: implement buffer
         with tf.variable_scope(exp_name):
@@ -123,7 +121,7 @@ class AgentGridWorld(Basic_model):
         self.tvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                        scope=self.exp_name)
         self.saver = tf.train.Saver(var_list=self.tvars, max_to_keep=1)
-        self.init = tf.initialize_variables(self.tvars)
+        self.init = tf.variables_initializer(self.tvars)
         self.target_replace_op = [tf.assign(t, b)
                                   for t, b in zip(t_params, b_params)]
         self.q_target = q_target

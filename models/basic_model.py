@@ -15,14 +15,11 @@ from models import layers
 logger = utils.get_logger()
 
 class Basic_model():
-    def __init__(self, config, exp_name='new_exp'):
+    def __init__(self, config, sess, exp_name='new_exp'):
         self.config = config
-        self.graph = tf.Graph()
         self.exp_name = exp_name
-        gpu_options = tf.GPUOptions(allow_growth=True)
-        configProto = tf.ConfigProto(gpu_options=gpu_options)
-        self.sess = tf.InteractiveSession(config=configProto,
-                                            graph=self.graph)
+        self.sess = sess
+        self.checkpoint_dir = os.path.join(self.config.model_dir, exp_name)
 
     def reset(self):
         raise NotImplementedError
@@ -36,7 +33,9 @@ class Basic_model():
     def train(self):
         raise NotImplementedError
 
-    def load_model(self, checkpoint_dir, ckpt_num=None):
+    def load_model(self, checkpoint_dir=None, ckpt_num=None):
+        if not checkpoint_dir:
+            checkpoint_dir = self.checkpoint_dir
         ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
         if not ckpt_num:
             if ckpt and ckpt.model_checkpoint_path:
@@ -50,7 +49,7 @@ class Basic_model():
                     model_checkpoint_path = cp
             if not model_checkpoint_path:
                 raise Exception('Ckpt num {} not found!'.format(ckpt_num))
-        logger.info('Loading pretrained model from: ' + model_checkpoint_path)
+        logger.info('Loading model from: ' + model_checkpoint_path)
         self.saver.restore(self.sess, model_checkpoint_path)
 
     def save_model(self, step):

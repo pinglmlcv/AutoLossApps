@@ -23,6 +23,7 @@ import sys
 import random
 import os
 import copy
+import numpy as np
 
 root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, root_path)
@@ -68,9 +69,15 @@ class PlayerSprite(prefab_sprites.MazeWalker):
     def __init__(self, corner, position, character):
         # Inform superclass that we can't walk through walls.
         super(PlayerSprite, self).__init__(corner, position, character, impassable='#')
+        # To enumerate how many times a position has been visited before.
+        self.visit = np.zeros((len(GAME_ART), len(GAME_ART[0])))
 
     def update(self, actions, board, layers, backdrop, things, the_plot):
         del backdrop, things   # Unused.
+        row = self.position.row
+        col = self.position.col
+        self.visit[row, col] += 1
+
         # Apply motion commands.
         old_position = self.position
         if actions == 0:    # walk upward?
@@ -84,16 +91,17 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-0.4)
+            the_plot.add_reward(-1.0)
+            the_plot.terminate_episode()
+            return
 
         # See if we've found the mystery spot.
         if layers['$'][self.position]:
             the_plot.add_reward(1.0)
             the_plot.terminate_episode()
+            return
         elif actions > -1:
-            the_plot.add_reward(-0.1)
-
-
+            the_plot.add_reward(-0.02)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -182,17 +190,18 @@ def main(argv=()):
     env.set_init_position((2,2))
 
     ob, _, _ = env.init_episode(True)
-    print(ob)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
-    env.update(1)
+    _, r, d = env.update(1)
+    print(r, d)
+    _, r, d = env.update(1)
+    print(r, d)
+    _, r, d = env.update(1)
+    print(r, d)
+    _, r, d = env.update(1)
+    print(r, d)
+    _, r, d = env.update(1)
+    print(r, d)
+    _, r, d = env.update(1)
+    print(r, d)
     env.update(1)
     env.update(1)
     env.update(1)

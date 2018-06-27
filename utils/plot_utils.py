@@ -13,8 +13,10 @@ engine = ''
 def lineplot(data):
     x1 = np.array(range(len(data[0])))
     x2 = np.array(range(len(data[1])))
+    x3 = np.array(range(len(data[2])))
     y1 = np.array(data[0])
     y2 = np.array(data[1])
+    y3 = np.array(data[2])
 
     # Plot code
     markersize = 9
@@ -35,9 +37,11 @@ def lineplot(data):
 
     fig, ax = plt.subplots()
     ax.plot(x1, y1, color='k',
-            linewidth=linewidth, label='baseline')
+            linewidth=linewidth, label='sync3')
     ax.plot(x2, y2, color='green',
-            linewidth=linewidth, label='autoLoss')
+            linewidth=linewidth, label='sync5')
+    ax.plot(x3, y3, color='blue',
+            linewidth=linewidth, label='sync10')
     #ax.plot(x1, y1, color='k', marker='s', markersize=markersize,
     #        linewidth=linewidth, label='baseline')
     #ax.plot(x2, y2, color='green', marker='D', markersize=markersize,
@@ -49,16 +53,16 @@ def lineplot(data):
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles, labels, loc = 'upper left', fontsize = legendfont)
 
-    ax.set_ylim(6, 7)
+    #ax.set_ylim(6, 7)
     #ax.set_xlim(0, 8)
 
     #ax.text(0.35, 0.1, 'Caffe', fontsize = 10)
     #ax.annotate('', xy=(1, 1), xytext=(0.35, 0.1),
     #                        )
 
-    plt.xlabel('Epoch (x10)', fontdict = labelfont)
-    plt.ylabel('$Inception Score (\mathcal{IS})$', fontdict = labelfont)
-    plt.xticks([0, 10, 20, 30, 40, 50, 60], fontsize = ticksize)
+    #plt.xlabel('Epoch (x10)', fontdict = labelfont)
+    #plt.ylabel('$Inception Score (\mathcal{IS})$', fontdict = labelfont)
+    #plt.xticks([0, 10, 20, 30, 40, 50, 60], fontsize = ticksize)
     #plt.yticks([0, 2, 4, 6, 8, 10], fontsize = ticksize)
 
     # set the grid lines to dotted
@@ -71,20 +75,27 @@ def lineplot(data):
     for line in ticklines:
         line.set_linewidth(10)
     plt.show()
-    fig.savefig('cifar.pdf', transparent = True, bbox_inches = 'tight', pad_inches = 0)
+    fig.savefig('sync_period.pdf', transparent = True, bbox_inches = 'tight', pad_inches = 0)
     #fig.savefig(save_dir + '.png', transparent = True, bbox_inches = 'tight', pad_inches = 0)
 
 
 def mnist_transfer_cifar10():
-    curve_baseline = log_utils.read_log_inps_baseline('../log_5-14/dcgan_cifar10_exp01_baseline.log')
-    #curve_autoLoss = log_utils.read_log_inps_baseline('../log_5-15/dcgan_cifar10_exp01_refine.log')
-    curve_autoLoss = log_utils.read_log_inps_baseline('../log_5-14/dcgan_cifar10_exp02_refine.log')
-    curve_baseline = np.array(curve_baseline)
-    curve_autoLoss = np.array(curve_autoLoss)
-    ind = np.arange(0,120,2)
-    curve_autoLoss = curve_autoLoss[ind]
-    curve_baseline = curve_baseline[:62]
-    lineplot([curve_baseline.tolist(), curve_autoLoss.tolist()])
+    curve_sync3 = log_utils.read_log_total_reward_aver('../log/log_6_26/agent0_sync3.log')
+    curve_sync5 = log_utils.read_log_total_reward_aver('../log/log_6_26/agent0_sync5.log')
+    curve_sync10 = log_utils.read_log_total_reward_aver('../log/log_6_26/agent0_sync10.log')
+
+    curve_sync3 = np.array(curve_sync3)
+    curve_sync5 = np.array(curve_sync5)
+    curve_sync10 = np.array(curve_sync10)
+    plt.figure(1)
+    plt.subplot(311)
+    plt.plot(curve_sync3)
+    plt.subplot(312)
+    plt.plot(curve_sync5)
+    plt.subplot(313)
+    plt.plot(curve_sync10)
+    plt.show()
+    plt.savefig('sync_period.pdf')
 
 def mnist_compare_with_baseline():
     num = sys.argv[1]
@@ -260,4 +271,4 @@ def gridworld():
     #fig.savefig(save_dir + '.png', transparent = True, bbox_inches = 'tight', pad_inches = 0)
 if __name__ == '__main__':
     #mnist_compare_with_baseline()
-    gridworld()
+    mnist_transfer_cifar10()

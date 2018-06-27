@@ -16,11 +16,13 @@ logger = utils.get_logger()
 
 class Controller(Basic_model):
     def __init__(self, config, sess, exp_name='new_exp_ctrl'):
-        self.config = config
-        self.sess = sess
-        self.exp_name = exp_name
+        super(Controller, self).__init__(config, sess, exp_name)
+        self.init = tf.constant([1])
         #self._build_placeholder()
         #self._build_graph()
+
+    def sync_net(self):
+        pass
 
     def _build_placeholder(self):
         config = self.config
@@ -118,10 +120,10 @@ class Controller(Basic_model):
         #
         #lesson_period = [20, 20, 10, 10, 20, 10, 10, 50]
         #lesson_id     = [0,  1,  3,  4,  2,  3,  4,  2 ]
-        #lesson_period = [100]
-        #lesson_id     = [2  ]
-        lesson_period = [20, 20] + [1] * 3 * 10 + [100]
-        lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
+        lesson_period = [100]
+        lesson_id     = [2  ]
+        #lesson_period = [20, 20] + [1] * 3 * 10 + [100]
+        #lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
 
         # Ten agents
         #lesson_period = [30] * 9 + [10] * 10 * 8 + [100]

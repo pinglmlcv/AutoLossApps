@@ -28,10 +28,10 @@ class Parser(object):
 
     def read_agent(self):
         agent = Section()
-        agent.add('dim_a', self.config.getint('agent', 'dim_a'))
-        agent.add('dim_s_h', self.config.getint('agent', 'dim_s_h'))
-        agent.add('dim_s_w', self.config.getint('agent', 'dim_s_w'))
-        agent.add('dim_s_c', self.config.getint('agent', 'dim_s_c'))
+        agent.add('dim_a', self.config.getint('agent', 'dim_a_agent'))
+        agent.add('dim_s_h', self.config.getint('agent', 'dim_s_h_agent'))
+        agent.add('dim_s_w', self.config.getint('agent', 'dim_s_w_agent'))
+        agent.add('dim_s_c', self.config.getint('agent', 'dim_s_c_agent'))
         agent.add('lr', self.config.getfloat('agent', 'lr_agent'))
         agent.add('total_episodes', self.config.getint('agent', 'total_episodes_agent'))
         agent.add('total_episodes_test', self.config.getint('agent', 'total_episodes_test_agent'))
@@ -45,6 +45,7 @@ class Parser(object):
         agent.add('synchronize_frequency', self.config.getint('agent', 'synchronize_frequency_agent'))
         agent.add('valid_frequency', self.config.getint('agent', 'valid_frequency_agent'))
         agent.add('save_frequency', self.config.getint('agent', 'save_frequency_agent'))
+        agent.add('mute', self.config.getboolean('agent', 'mute_agent'))
 
         return agent
 
@@ -55,6 +56,16 @@ class Parser(object):
         meta.add('distill_temp', self.config.getfloat('meta', 'distill_temp'))
         meta.add('buffer_size', self.config.getint('meta', 'buffer_size_meta'))
         meta.add('ema_decay', self.config.getfloat('meta', 'ema_decay'))
+        meta.add('dim_a', self.config.getint('meta', 'dim_a_meta'))
+        meta.add('dim_h', self.config.getint('meta', 'dim_h_meta'))
+        meta.add('dim_s', self.config.getint('meta', 'dim_s_meta'))
+        meta.add('cliprange', self.config.getfloat('meta', 'cliprange_meta'))
+        meta.add('controller', self.config.get('meta', 'controller'))
+        meta.add('batch_size', self.config.getint('meta', 'batch_size_meta'))
+        meta.add('lr', self.config.getfloat('meta', 'lr_meta'))
+        meta.add('logits_scale', self.config.getfloat('meta', 'logits_scale_meta'))
+        meta.add('save_frequency', self.config.getint('meta', 'save_frequency_meta'))
+        meta.add('reward_strategy', self.config.get('meta', 'reward_strategy_meta'))
 
         return meta
 
