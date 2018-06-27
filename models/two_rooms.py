@@ -91,8 +91,8 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-1.0)
-            the_plot.terminate_episode()
+            the_plot.add_reward(-0.5)
+            #the_plot.terminate_episode()
             return
 
         # See if we've found the mystery spot.
@@ -101,7 +101,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.02)
+            the_plot.add_reward(-0.1)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -116,11 +116,13 @@ class Env2Rooms():
     def __init__(self, config, default_goal=None, optional_goals=None,
                  default_init=None, optional_inits=None):
         self.config = config
+        self.max_time_steps = config.agent.total_steps
         self.game_art = copy.deepcopy(GAME_ART)
         self.default_goal = default_goal
         self.default_init = default_init
         self.optional_goals = optional_goals
         self.optional_inits = optional_inits
+        self.time_steps = 0
 
     def init_episode(self, display_flag):
         self.game = make_game(self.game_art)
@@ -134,6 +136,7 @@ class Env2Rooms():
 
     def reset_game_art(self):
         self.game_art = copy.deepcopy(GAME_ART)
+        self.time_steps = 0
 
     def set_goal_position(self, goal=None):
         # Three mode to set the goal position,
@@ -159,10 +162,14 @@ class Env2Rooms():
 
 
     def update(self, action):
+        self.time_steps += 1
         if self.display_flag:
             observation, reward, discount = self.ui.update(action)
         else:
             observation, reward, discount = self.game.play(action)
+        # ----Terminate when timestep exceeds a limit
+        if self.time_steps > self.max_time_steps:
+            discount = 0
         return observation, reward, discount
 
     def sample_random_position(self, optional_position=None):
@@ -189,21 +196,23 @@ def main(argv=()):
     env.set_goal_position((3,3))
     env.set_init_position((2,2))
 
-    ob, _, _ = env.init_episode(True)
-    _, r, d = env.update(1)
-    print(r, d)
-    _, r, d = env.update(1)
-    print(r, d)
-    _, r, d = env.update(1)
-    print(r, d)
-    _, r, d = env.update(1)
-    print(r, d)
-    _, r, d = env.update(1)
-    print(r, d)
-    _, r, d = env.update(1)
-    print(r, d)
+    env.init_episode(True)
     env.update(1)
+    env.update(0)
     env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
+    env.update(1)
+    env.update(0)
     env.update(1)
 
 

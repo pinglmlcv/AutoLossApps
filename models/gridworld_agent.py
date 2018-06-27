@@ -46,6 +46,7 @@ class AgentGridWorld(Basic_model):
     def __init__(self, config, sess, exp_name='agent_gridworld'):
         super(AgentGridWorld, self).__init__(config, sess, exp_name)
         self.update_steps = 0
+        self.current_state = None
         #TODO: implement buffer
         with tf.variable_scope(exp_name):
             self._build_placeholder()

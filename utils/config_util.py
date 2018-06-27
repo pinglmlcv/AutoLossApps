@@ -46,6 +46,7 @@ class Parser(object):
         agent.add('valid_frequency', self.config.getint('agent', 'valid_frequency_agent'))
         agent.add('save_frequency', self.config.getint('agent', 'save_frequency_agent'))
         agent.add('mute', self.config.getboolean('agent', 'mute_agent'))
+        agent.add('lesson_length', self.config.getint('agent', 'lesson_length'))
 
         return agent
 
