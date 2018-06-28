@@ -144,6 +144,7 @@ class Trainer():
             #   2: train agent2
             #   3: distill from agent0 to agent2
             #   4: distill from agent1 to agent2
+
             # NOTE: We call M timesteps as an episode. Because the length of an
             # episode is unfixed so the training steps of each lesson is
             # different if we use a true episode as a lesson.
@@ -166,11 +167,6 @@ class Trainer():
                                                 epsilon,
                                                 mute=config.agent.mute)
                     ep_agent[student] += 1
-                    #if ep_agent[student] % config.agent.valid_frequency == 0:
-                    #    logger.info('++++test agent {}++++'.format(student))
-                    #    self.test_agent(self.agent_list[student],
-                    #                    self.env_list[student])
-                    #    logger.info('++++++++++')
                 else:
                     # TODO: For brevity, we use the expert net to sample actions.
                     # Previous study showed that sampling actions from student
@@ -186,29 +182,24 @@ class Trainer():
                                                   epsilon,
                                                   mute=config.agent.mute)
                     ep_agent[student] += 1
-                    #if ep_agent[student] % config.agent.valid_frequency == 0:
-                    #    logger.info('++++test agent {}++++'.format(student))
-                    #    r = self.test_agent(self.agent_list[student],
-                    #                        self.env_list[student])
-                    #    target_agent_performance.apend(r)
-                    #    logger.info('++++++++++')
+
                 # ----Update performance matrix.----
                 mask = np.zeros((nAgent, nAgent), dtype=int)
                 mask[student] = 1
-                #self.update_performance_matrix(performance_matrix, ep, mask)
-                #logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
-                if ep % config.agent.synchronize_frequency == 0:
-                    agent.sync_net()
+                self.update_performance_matrix(performance_matrix, ep, mask)
+                logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
 
-                if (ep + 1) % config.agent.valid_frequency == 0:
-                    print('episode: {}'.format(ep))
+                if ep_agent[student] % config.agent.valid_frequency == 0:
+                    logger.info('++++test agent {}++++'.format(student))
+                    logger.info('update times: {}'.format(ep_agent[student]))
                     rew = []
                     for i in range(1):
                         r = self.test_agent(self.agent_list[student],
                                             self.env_list[student],
-                                            num_episodes=100,
                                             mute=False)
                         rew.append(r)
+                    logger.info('++++++++')
+
 
                 # NOTE: Record performance of target agent whenever it has been
                 # updated for `valid_frequency` steps. This recording is used
@@ -274,77 +265,79 @@ class Trainer():
         config = self.config
 
         # ----Lesson version.----
-        #if agent.current_state is None:
-        #    env.reset_game_art()
-        #    env.set_goal_position()
-        #    env.set_init_position()
-        #    observation, _, _ = \
-        #        env.init_episode(config.emulator.display_flag)
-        #    state = preprocess(observation)
-        #else:
-        #    state = agent.current_state
+        if env.current_state is None:
+            env.reset_game_art()
+            env.set_goal_position()
+            env.set_init_position()
+            observation, _, _ = \
+                env.init_episode(config.emulator.display_flag)
+            state = preprocess(observation)
+        else:
+            state = env.current_state
 
-        #for step in range(config.agent.lesson_length):
-        #    action = agent.run_step(state, epsilon)
-        #    observation, reward, alive = env.update(action)
-        #    next_state = preprocess(observation)
-        #    transition = {'state': state,
-        #                  'action': action,
-        #                  'reward': reward,
-        #                  'next_state': next_state}
-        #    replayBuffer.add(transition)
-        #    if replayBuffer.population > config.agent.batch_size:
-        #        batch = replayBuffer.get_batch(config.agent.batch_size)
-        #        agent.update(batch)
-
-        #    state = next_state
-        #    if not alive:
-        #        # ----One episode finished, start another.----
-        #        env.reset_game_art()
-        #        env.set_goal_position()
-        #        env.set_init_position()
-        #        observation, _, _ = \
-        #            env.init_episode(config.emulator.display_flag)
-        #        state = preprocess(observation)
-
-        #agent.current_state = state
-
-        # ----Old version, process a total episode at a time.----
-        env.reset_game_art()
-        env.set_goal_position()
-        env.set_init_position()
-        observation, reward, _ =\
-            env.init_episode(config.emulator.display_flag)
-        state = preprocess(observation)
-
-        # ----Running one episode.----
-        total_reward = 0
-        for step in range(config.agent.total_steps - 1):
+        for step in range(config.agent.lesson_length):
             action = agent.run_step(state, epsilon)
             observation, reward, alive = env.update(action)
-            total_reward += reward
             next_state = preprocess(observation)
             transition = {'state': state,
                           'action': action,
                           'reward': reward,
                           'next_state': next_state}
             replayBuffer.add(transition)
-
             if replayBuffer.population > config.agent.batch_size:
-                batch_size = config.agent.batch_size
-            else:
-                batch_size = replayBuffer.population
-            batch = replayBuffer.get_batch(batch_size)
-            agent.update(batch)
+                batch = replayBuffer.get_batch(config.agent.batch_size)
+                agent.update(batch)
+                if agent.update_steps % config.agent.synchronize_frequency == 0:
+                    agent.sync_net()
 
             state = next_state
             if not alive:
-                break
-        if not mute:
-            if alive:
-                logger.info('failed')
-            logger.info('total_reward this episode: {}'.format(total_reward))
-            logger.info(step)
+                # ----One episode finished, start another.----
+                env.reset_game_art()
+                env.set_goal_position()
+                env.set_init_position()
+                observation, _, _ = \
+                    env.init_episode(config.emulator.display_flag)
+                state = preprocess(observation)
+
+        env.current_state = state
+
+        # ----Old version, process a total episode at a time.----
+        #env.reset_game_art()
+        #env.set_goal_position()
+        #env.set_init_position()
+        #observation, reward, _ =\
+        #    env.init_episode(config.emulator.display_flag)
+        #state = preprocess(observation)
+
+        ## ----Running one episode.----
+        #total_reward = 0
+        #for step in range(config.agent.total_steps - 1):
+        #    action = agent.run_step(state, epsilon)
+        #    observation, reward, alive = env.update(action)
+        #    total_reward += reward
+        #    next_state = preprocess(observation)
+        #    transition = {'state': state,
+        #                  'action': action,
+        #                  'reward': reward,
+        #                  'next_state': next_state}
+        #    replayBuffer.add(transition)
+
+        #    if replayBuffer.population > config.agent.batch_size:
+        #        batch_size = config.agent.batch_size
+        #    else:
+        #        batch_size = replayBuffer.population
+        #    batch = replayBuffer.get_batch(batch_size)
+        #    agent.update(batch)
+
+        #    state = next_state
+        #    if not alive:
+        #        break
+        #if not mute:
+        #    if alive:
+        #        logger.info('failed')
+        #    logger.info('total_reward this episode: {}'.format(total_reward))
+        #    logger.info(step)
         # ----Old version, end.----
 
     def distill_agent_one_lesson(self, agent_t, agent_s, env, replayBuffer,
@@ -355,7 +348,7 @@ class Trainer():
 
         config = self.config
 
-        if agent.current_state is None:
+        if env.current_state is None:
             env.reset_game_art()
             env.set_goal_position()
             env.set_init_position()
@@ -363,7 +356,7 @@ class Trainer():
                 env.init_episode(config.emulator.display_flag)
             state = preprocess(observation)
         else:
-            state = agent.current_state
+            state = env.current_state
 
         for step in range(config.agent.lesson_length):
             action = agent_t.run_step(state, epsilon)
@@ -380,6 +373,8 @@ class Trainer():
                 q_expert = agent_t.calc_q_value(batch['state'])
                 batch['q_expert'] = q_expert
                 agent_s.update_distill(batch)
+                if agent_s.update_steps % config.agent.synchronize_frequency == 0:
+                    agent_s.sync_net()
 
             state = next_state
             if not alive:
@@ -390,7 +385,7 @@ class Trainer():
                 obervation, _, _ = \
                     env.init_episode(config.emulator.display_flag)
                 state = preprocess(observation)
-        agent.current_state = state
+        env.current_state = state
 
         # ----Old version, process a total episode at a time.----
         #env.reset_game_art()
@@ -547,9 +542,9 @@ class Trainer():
             logger.info('total_reward_aver: {}'.format(total_reward_aver))
             logger.info('success_rate: {}'.format(success_rate))
 
-        # NOTE: set agent.current_state to None because testing process
+        # NOTE: set env.current_state to None because testing process
         # interrupts the training process
-        agent.current_state = None
+        env.current_state = None
 
         return total_reward_aver
 

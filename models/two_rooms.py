@@ -91,8 +91,8 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-0.5)
-            #the_plot.terminate_episode()
+            the_plot.add_reward(-1.0)
+            the_plot.terminate_episode()
             return
 
         # See if we've found the mystery spot.
@@ -101,7 +101,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.1)
+            the_plot.add_reward(-0.02)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -123,6 +123,7 @@ class Env2Rooms():
         self.optional_goals = optional_goals
         self.optional_inits = optional_inits
         self.time_steps = 0
+        self.current_state = None
 
     def init_episode(self, display_flag):
         self.game = make_game(self.game_art)

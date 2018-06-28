@@ -23,6 +23,7 @@ class BasePPO(Basic_model):
             self.lr = tf.placeholder(tf.float32, name='learning_rate')
 
     def _build_graph(self):
+        value, _ = self.build_critic_net('value_net')
         pi, pi_param = self.build_actor_net('actor_net', trainable=True)
         old_pi, old_pi_param = self.build_actor_net('old_actor_net',
                                                     trainable=False)
@@ -111,4 +112,24 @@ class MlpPPO(BasePPO):
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
 
             return output, param
+
+
+    def build_critic_net(self, scope):
+        with tf.variable_scope(scope):
+            dim_h = self.config.meta.dim_h
+            hidden = tf.contrib.layers.fully_connected(
+                inputs=self.state,
+                num_outputs=dim_h,
+                activation_fn=tf.nn.leaky_relu,
+                scope='fc1')
+
+            value = tf.contrib.layers.fully_connected(
+                inputs=hidden,
+                num_outputs=1,
+                activation_fn=None,
+                scope='fc2')
+
+            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
+
+            return value, param
 
