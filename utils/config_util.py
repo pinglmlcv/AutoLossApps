@@ -57,6 +57,7 @@ class Parser(object):
         meta.add('distill_temp', self.config.getfloat('meta', 'distill_temp'))
         meta.add('buffer_size', self.config.getint('meta', 'buffer_size_meta'))
         meta.add('ema_decay', self.config.getfloat('meta', 'ema_decay'))
+        meta.add('ema_decay_auc_baseline', self.config.getfloat('meta', 'ema_decay_auc_baseline'))
         meta.add('dim_a', self.config.getint('meta', 'dim_a_meta'))
         meta.add('dim_h', self.config.getint('meta', 'dim_h_meta'))
         meta.add('dim_s', self.config.getint('meta', 'dim_s_meta'))

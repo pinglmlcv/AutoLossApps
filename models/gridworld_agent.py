@@ -131,7 +131,7 @@ class AgentGridWorld(Basic_model):
 
     def sync_net(self):
         self.sess.run(self.target_replace_op)
-        logger.info('target_network synchronized')
+        #logger.info('target_network synchronized')
 
     def train(self, save_model=False):
         sess = self.sess

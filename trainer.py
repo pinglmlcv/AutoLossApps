@@ -117,6 +117,7 @@ class Trainer():
 
         for ep_meta in range(config.meta.total_episodes):
             logger.info('######## meta_episodes {} #########'.format(ep_meta))
+            start_time = time.time()
             replayBufferAgent_list = []
             for i in range(len(self.agent_list)):
                 replayBufferAgent_list.append(
@@ -187,18 +188,18 @@ class Trainer():
                 mask = np.zeros((nAgent, nAgent), dtype=int)
                 mask[student] = 1
                 self.update_performance_matrix(performance_matrix, ep, mask)
-                logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
+                #logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
 
-                if ep_agent[student] % config.agent.valid_frequency == 0:
-                    logger.info('++++test agent {}++++'.format(student))
-                    logger.info('update times: {}'.format(ep_agent[student]))
-                    rew = []
-                    for i in range(1):
-                        r = self.test_agent(self.agent_list[student],
-                                            self.env_list[student],
-                                            mute=False)
-                        rew.append(r)
-                    logger.info('++++++++')
+                #if ep_agent[student] % config.agent.valid_frequency == 0:
+                #    logger.info('++++test agent {}++++'.format(student))
+                #    logger.info('update times: {}'.format(ep_agent[student]))
+                #    rew = []
+                #    for i in range(1):
+                #        r = self.test_agent(self.agent_list[student],
+                #                            self.env_list[student],
+                #                            mute=False)
+                #        rew.append(r)
+                #    logger.info('++++++++')
 
 
                 # NOTE: Record performance of target agent whenever it has been
@@ -255,6 +256,7 @@ class Trainer():
                 controller.save_model(ep_meta)
 
             # ----End of a meta episode.----
+            logger.info('running time: {}'.format(time.time() - start_time))
             logger.info('#################')
 
     def train_agent_one_lesson(self, agent, env, replayBuffer, epsilon,
@@ -561,7 +563,7 @@ class Trainer():
                 if mask[i, j]:
                     r = self.test_agent(self.agent_list[i],
                                         self.env_list[j],
-                                        num_episodes=1,
+                                        num_episodes=5,
                                         mute=True)
                     performance_matrix[i, j, ep + 1] =\
                         performance_matrix[i, j, ep] * ema_decay\
@@ -591,7 +593,7 @@ class Trainer():
             meta_reward = 0
             self.auc_baseline = auc
         else:
-            ema_decay = self.config.meta.ema_decay
+            ema_decay = self.config.meta.ema_decay_auc_baseline
             meta_reward = auc - self.auc_baseline
             self.auc_baseline = self.auc_baseline * ema_decay\
                 + auc * (1 - ema_decay)
