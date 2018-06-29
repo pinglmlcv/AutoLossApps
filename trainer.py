@@ -36,6 +36,10 @@ def area_under_curve(curve, strategy='square'):
         elif strategy == 'uniform':
             return sum(np.array(curve)) / len(curve)
 
+def reward_decay(meta_transitions, gamma):
+    for i in range(len(meta_transitions) - 2, -1, -1):
+        meta_transitions[i]['reward'] += meta_transitions[i+1]['reward'] * gamma
+
 
 class Trainer():
     """ A class to wrap training code. """
@@ -188,6 +192,8 @@ class Trainer():
                 mask = np.zeros((nAgent, nAgent), dtype=int)
                 mask[student] = 1
                 self.update_performance_matrix(performance_matrix, ep, mask)
+                meta_reward = self.get_meta_reward_real_time(
+                    performance_matrix, ep)
                 #logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
 
                 #if ep_agent[student] % config.agent.valid_frequency == 0:
@@ -216,40 +222,51 @@ class Trainer():
                 #         target_agent_performance.append(r)
                 #         logger.info('++++++++++')
                 # ----option 2----
-                if student == nAgent - 1:
-                    target_agent_performance.append(
-                        performance_matrix[-1, -1, ep + 1])
+                # if student == nAgent - 1:
+                #     target_agent_performance.append(
+                #         performance_matrix[-1, -1, ep + 1])
 
                 # ----Update lesson probability.----
                 lesson_history.append(lesson)
                 lesson_prob = self.calc_lesson_prob(lesson_history)
-                #if ep % 20 == 0:
-                #    logger.info('ep: {}, lesson_prob: {}'.format(ep, lesson_prob))
+                if ep % 20 == 0:
+                    logger.info('ep: {}, lesson_prob: {}'.format(ep, lesson_prob))
 
                 # ----Save transition.----
                 transition = {'state': meta_state,
                               'action': meta_action,
-                              'reward': 0,
+                              'reward': meta_reward,
                               'next_state': 0}
                 meta_transitions.append(transition)
 
                 # ----End of an agent episode.----
 
-            # ----Calculate meta_reward.----
+            r = self.test_agent(self.agent_list[0],
+                                self.env_list[0],
+                                num_episodes=100,
+                                mute=False)
+            # ----Calculate meta_reward_final.----
             # TODO: Haven't found a better way to evaluate
-            meta_reward = self.get_meta_reward(target_agent_performance)
+            # ----option 1----
+            #meta_reward = self.get_meta_reward(target_agent_performance)
+            #for t in meta_transitions:
+            #    t['reward'] = meta_reward
+            #    replayBufferMeta.add(t)
+            #logger.info(target_agent_performance)
+            #logger.info(meta_reward)
+
+            # ----option 2----
+            reward_decay(meta_transitions, config.meta.gamma)
             for t in meta_transitions:
-                t['reward'] = meta_reward
                 replayBufferMeta.add(t)
-            logger.info(target_agent_performance)
-            logger.info(meta_reward)
+            print(meta_transitions)
 
             # ----Update controller using PPO.----
             for i in range(10):
-                if replayBufferMeta.population > config.meta.batch_size:
-                    batch = replayBufferMeta.get_batch(config.meta.batch_size)
-                    controller.update(batch)
+                batch = replayBufferMeta.get_batch(replayBufferMeta.population)
+                controller.update(batch)
             controller.sync_net()
+            replayBufferMeta.clear()
 
             # ----Save contrller.----
             if ep_meta % config.meta.save_frequency == 0:
@@ -563,7 +580,7 @@ class Trainer():
                 if mask[i, j]:
                     r = self.test_agent(self.agent_list[i],
                                         self.env_list[j],
-                                        num_episodes=5,
+                                        num_episodes=1,
                                         mute=True)
                     performance_matrix[i, j, ep + 1] =\
                         performance_matrix[i, j, ep] * ema_decay\
@@ -598,6 +615,16 @@ class Trainer():
             self.auc_baseline = self.auc_baseline * ema_decay\
                 + auc * (1 - ema_decay)
         return meta_reward
+
+    def get_meta_reward_real_time(self, matrix, ep):
+        old = matrix[:, :, ep]
+        new = matrix[:, :, ep + 1]
+        reward = 0
+        #for i in range(len(self.agent_list)):
+        #    reward += (new[i, i] - old[i, i])
+        # TODO: only to check the meta model, remove later
+        reward = new[0, 0] - old[0, 0]
+        return reward
 
 
 if __name__ == '__main__':

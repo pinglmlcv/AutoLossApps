@@ -68,6 +68,7 @@ class Parser(object):
         meta.add('logits_scale', self.config.getfloat('meta', 'logits_scale_meta'))
         meta.add('save_frequency', self.config.getint('meta', 'save_frequency_meta'))
         meta.add('reward_strategy', self.config.get('meta', 'reward_strategy_meta'))
+        meta.add('gamma', self.config.getfloat('meta', 'gamma_meta'))
 
         return meta
 

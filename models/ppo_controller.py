@@ -18,8 +18,8 @@ class BasePPO(Basic_model):
                                         name='state')
             self.action = tf.placeholder(tf.int32, shape=[None],
                                          name='action')
-            self.advantage = tf.placeholder(tf.float32, shape=[None],
-                                            name='advantage')
+            self.target_value = tf.placeholder(tf.float32, shape=[None],
+                                               name='target_value')
             self.lr = tf.placeholder(tf.float32, name='learning_rate')
 
     def _build_graph(self):
@@ -35,19 +35,27 @@ class BasePPO(Basic_model):
 
         cliprange = self.config.meta.cliprange
 
+        with tf.variable_scope('critic_loss'):
+            adv = self.target_value - value
+            self.critic_loss = tf.reduce_mean(tf.square(adv))
+
+        # NOTE: Stop passing gradient through adv
+        adv = tf.stop_gradient(adv, name='adv_stop_gradient')
+
         with tf.variable_scope('actor_loss'):
             ratio = pi_wrt_a / old_pi_wrt_a
-            pg_losses1 = self.advantage * ratio
-            pg_losses2 = self.advantage * tf.clip_by_value(ratio,
-                                                           1.0 - cliprange,
-                                                           1.0 + cliprange)
+            pg_losses1 = adv * ratio
+            pg_losses2 = adv * tf.clip_by_value(ratio,
+                                                1.0 - cliprange,
+                                                1.0 + cliprange)
             self.actor_loss = -tf.reduce_mean(tf.minimum(pg_losses1,
                                                          pg_losses2))
 
         self.sync_op = [oldp.assign(p)
                         for p, oldp in zip(pi_param, old_pi_param)]
         optimizer = tf.train.AdamOptimizer(self.lr)
-        self.train_op = optimizer.minimize(self.actor_loss)
+        self.train_op_actor = optimizer.minimize(self.actor_loss)
+        self.train_op_critic = optimizer.minimize(self.critic_loss)
 
         self.tvars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                        scope=self.exp_name)
@@ -73,14 +81,13 @@ class BasePPO(Basic_model):
     def update(self, transition_batch):
         state = transition_batch['state']
         action = transition_batch['action']
-        advantage = transition_batch['reward']
-        fetch = [self.train_op]
+        target_value = transition_batch['reward']
+        fetch = [self.train_op_actor, self.train_op_critic]
         feed_dict = {self.state: state,
                      self.action: action,
-                     self.advantage: advantage,
+                     self.target_value: target_value,
                      self.lr: self.config.meta.lr}
         _ = self.sess.run(fetch, feed_dict)
-
 
 
 class MlpPPO(BasePPO):
@@ -112,7 +119,6 @@ class MlpPPO(BasePPO):
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
 
             return output, param
-
 
     def build_critic_net(self, scope):
         with tf.variable_scope(scope):
