@@ -249,6 +249,14 @@ class Trainer():
                             self.env_list[0],
                             num_episodes=100,
                             mute=False)
+            self.test_agent(self.agent_list[1],
+                            self.env_list[1],
+                            num_episodes=100,
+                            mute=False)
+            self.test_agent(self.agent_list[2],
+                            self.env_list[2],
+                            num_episodes=100,
+                            mute=False)
             # ----Calculate meta_reward_final.----
             # TODO: Haven't found a better way to evaluate
             # ----option 1----
@@ -555,7 +563,7 @@ class Trainer():
         #for i in range(len(self.agent_list)):
         #    reward += (new[i, i] - old[i, i])
         # TODO: only to check the meta model, remove later
-        reward = new[0, 0] - old[0, 0]
+        reward = new[2, 2] - old[2, 2]
         return reward
 
 
