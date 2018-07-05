@@ -1,6 +1,7 @@
 from configparser import ConfigParser, ExtendedInterpolation
 import json
 import os, sys
+import socket
 root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, root_path)
 import utils
@@ -91,12 +92,11 @@ class Parser(object):
         return os.path.expanduser(self.config.get('env', 'exp_dir'))
 
     @property
-    def data_dir(self):
-        return os.path.expanduser(self.config.get('env', 'data_dir'))
-
-    @property
     def model_dir(self):
-        return os.path.expanduser(self.config.get('env', 'model_dir'))
+        if socket.gethostname() == 'Luna-Desktop':
+            return os.path.expanduser(self.config.get('env', 'model_dir2'))
+        else:
+            return os.path.expanduser(self.config.get('env', 'model_dir1'))
 
     @property
     def save_images_dir(self):
