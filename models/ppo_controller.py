@@ -93,7 +93,7 @@ class BasePPO(Basic_model):
                      self.target_value: target_value,
                      self.lr: self.config.meta.lr}
         _, _, value = self.sess.run(fetch, feed_dict)
-        if fi == 0:
+        if fi == -1:
             for i in range(60):
                 logger.info('value: {}, target_value: {}'.format(value[i], target_value[i]))
 
