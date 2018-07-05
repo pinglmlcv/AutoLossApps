@@ -552,10 +552,10 @@ class Trainer():
         old = matrix[:, :, ep]
         new = matrix[:, :, ep + 1]
         reward = 0
-        #for i in range(len(self.agent_list)):
-        #    reward += (new[i, i] - old[i, i])
+        for i in range(len(self.agent_list)):
+            reward += (new[i, i] - old[i, i])
         # TODO: only to check the meta model, remove later
-        reward = new[0, 0] - old[0, 0]
+        #reward = new[0, 0] - old[0, 0]
         return reward
 
 
