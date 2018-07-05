@@ -51,8 +51,10 @@ class BasePPO(Basic_model):
             self.actor_loss = -tf.reduce_mean(tf.minimum(pg_losses1,
                                                          pg_losses2))
 
-        self.sync_op = [oldp.assign(p)
-                        for p, oldp in zip(pi_param, old_pi_param)]
+        #self.sync_op = [oldp.assign(p)
+        #                for p, oldp in zip(pi_param, old_pi_param)]
+        self.sync_op = [tf.assign(oldp, p)
+                        for oldp, p in zip(old_pi_param, pi_param)]
         optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op_actor = optimizer.minimize(self.actor_loss)
         self.train_op_critic = optimizer.minimize(self.critic_loss)
@@ -63,6 +65,9 @@ class BasePPO(Basic_model):
         self.saver = tf.train.Saver(var_list=self.tvars, max_to_keep=1)
 
         self.pi = pi
+        self.value = value
+        self.ratio = ratio
+        self.old_pi_param = old_pi_param
 
     def build_actor_net(self, scope, trainable):
         raise NotImplementedError
@@ -72,22 +77,25 @@ class BasePPO(Basic_model):
         pi = self.sess.run(self.pi, {self.state: state})[0]
         dim_a = self.config.meta.dim_a
         action = np.random.choice(dim_a, 1, p=pi)[0]
-        return action
+        return action, pi
 
     def sync_net(self):
         self.sess.run(self.sync_op)
-        #logger.info('meta_target_network synchronized')
+        logger.info('meta_target_network synchronized')
 
-    def update(self, transition_batch):
+    def update(self, transition_batch, fi=0):
         state = transition_batch['state']
         action = transition_batch['action']
         target_value = transition_batch['reward']
-        fetch = [self.train_op_actor, self.train_op_critic]
+        fetch = [self.train_op_actor, self.train_op_critic, self.value]
         feed_dict = {self.state: state,
                      self.action: action,
                      self.target_value: target_value,
                      self.lr: self.config.meta.lr}
-        _ = self.sess.run(fetch, feed_dict)
+        _, _, value = self.sess.run(fetch, feed_dict)
+        if fi == 0:
+            for i in range(60):
+                logger.info('value: {}, target_value: {}'.format(value[i], target_value[i]))
 
 
 class MlpPPO(BasePPO):
@@ -115,9 +123,9 @@ class MlpPPO(BasePPO):
                 trainable=trainable,
                 scope='fc2')
 
-            output = tf.nn.softmax(logits / self.config.meta.logits_scale)
-            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
-
+            output = tf.nn.softmax(logits * self.config.meta.logits_scale)
+            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                      '{}/{}'.format(self.exp_name, scope))
             return output, param
 
     def build_critic_net(self, scope):
@@ -135,7 +143,28 @@ class MlpPPO(BasePPO):
                 activation_fn=None,
                 scope='fc2')
 
-            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope)
+            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                      '{}/{}'.format(self.exp_name, scope))
 
             return value, param
 
+
+class LSTMPPO(BasePPO):
+    # ----
+    # Discrete control actor-actor model with LSTM
+    # ----
+    def __init__(self, config, sess, exp_name='LSTMPPO'):
+        super(LSTMPPO, self).__init__(config, sess, exp_name)
+        with tf.variable_scope(exp_name):
+            self._build_placeholder()
+            self._build_graph()
+
+    def build_actor_net(self, scope, trainable):
+        with tf.variable_scope(scope):
+            dim_h = self.config.meta_dim_h_lstm
+            nlayers = self.config.meta_nlayers_lstm
+
+        pass
+
+    def build_critic_net(self, scope):
+        pass
