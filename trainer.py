@@ -274,8 +274,10 @@ class Trainer():
 
             # ----Update controller using PPO.----
             if ep_meta % config.meta.n_parallel_actor == 0:
+                buffer_size = min(config.meta.buffer_size,
+                                  replayBufferMeta.population)
                 for i in range(10):
-                    batch = replayBufferMeta.get_batch(config.meta_buffer_size)
+                    batch = replayBufferMeta.get_batch(buffer_size)
                     controller.update(batch, i)
                 controller.sync_net()
                 replayBufferMeta.clear()
@@ -474,7 +476,10 @@ class Trainer():
         return lesson_prob / max(1, len(s))
 
     def get_meta_state(self, pm, lp):
-        return np.concatenate((pm.flatten() / 10, lp))
+        config = self.config
+        dim_a = config.meta.dim_a
+        lp = (lp - 0.5) * 2
+        return np.concatenate((pm.flatten(), lp))
 
     def get_meta_reward(self, curve):
         auc = area_under_curve(curve, self.config.meta.reward_strategy)
