@@ -70,6 +70,7 @@ class Parser(object):
         meta.add('save_frequency', self.config.getint('meta', 'save_frequency_meta'))
         meta.add('reward_strategy', self.config.get('meta', 'reward_strategy_meta'))
         meta.add('gamma', self.config.getfloat('meta', 'gamma_meta'))
+        meta.add('n_parallel_actor', self.config.getint('meta', 'n_parallel_actor'))
 
         return meta
 
