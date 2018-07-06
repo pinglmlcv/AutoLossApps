@@ -71,6 +71,7 @@ class Parser(object):
         meta.add('reward_strategy', self.config.get('meta', 'reward_strategy_meta'))
         meta.add('gamma', self.config.getfloat('meta', 'gamma_meta'))
         meta.add('n_parallel_actor', self.config.getint('meta', 'n_parallel_actor'))
+        meta.add('entropy_bonus_beta', self.config.getfloat('meta', 'entropy_bonus_beta_meta'))
 
         return meta
 

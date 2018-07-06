@@ -37,7 +37,10 @@ class BasePPO(Basic_model):
 
         with tf.variable_scope('critic_loss'):
             adv = self.target_value - value
-            self.critic_loss = tf.reduce_mean(tf.square(adv))
+            entropy = -tf.reduce_mean(tf.reduce_sum(pi * tf.log(pi), 1))
+            beta = self.config.meta.entropy_bonus_beta
+            self.critic_loss = tf.reduce_mean(tf.square(adv)) +\
+                beta * entropy
 
         # NOTE: Stop passing gradient through adv
         adv = tf.stop_gradient(adv, name='adv_stop_gradient')
