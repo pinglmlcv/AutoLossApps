@@ -84,8 +84,9 @@ class Trainer():
         #                  (6, 14),
         #                  (6, 18),
         #                  (4, 10)]
-        optional_goals = [(3, 3),
-                          (5, 17)]
+        #optional_goals = [(3, 3),
+        #                  (5, 17)]
+        optional_goals = [(3, 3)]
 
         for goal in optional_goals:
             self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
@@ -251,10 +252,6 @@ class Trainer():
                             mute=False)
             self.test_agent(self.agent_list[1],
                             self.env_list[1],
-                            num_episodes=100,
-                            mute=False)
-            self.test_agent(self.agent_list[2],
-                            self.env_list[2],
                             num_episodes=100,
                             mute=False)
             # ----Calculate meta_reward_final.----
@@ -500,7 +497,7 @@ class Trainer():
         reward = 0
         #for i in range(len(self.agent_list)):
         #    reward += (new[i, i] - old[i, i])
-        reward = new[2, 2] - old[2, 2]
+        reward = new[1, 1] - old[1, 1]
         # TODO: only to check the meta model, remove later
         return reward
 
