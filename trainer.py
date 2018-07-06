@@ -273,11 +273,12 @@ class Trainer():
                 replayBufferMeta.add(t)
 
             # ----Update controller using PPO.----
-            for i in range(10):
-                batch = replayBufferMeta.get_batch(replayBufferMeta.population)
-                controller.update(batch, i)
-            controller.sync_net()
-            replayBufferMeta.clear()
+            if ep_meta % config.meta.n_parallel_actor == 0:
+                for i in range(10):
+                    batch = replayBufferMeta.get_batch(config.meta_buffer_size)
+                    controller.update(batch, i)
+                controller.sync_net()
+                replayBufferMeta.clear()
 
             # ----Save contrller.----
             if ep_meta % config.meta.save_frequency == 0:
