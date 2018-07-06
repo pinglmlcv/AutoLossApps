@@ -332,44 +332,6 @@ class Trainer():
 
         env.current_state = state
 
-        # ----Old version, process a total episode at a time.----
-        #env.reset_game_art()
-        #env.set_goal_position()
-        #env.set_init_position()
-        #observation, reward, _ =\
-        #    env.init_episode(config.emulator.display_flag)
-        #state = preprocess(observation)
-
-        ## ----Running one episode.----
-        #total_reward = 0
-        #for step in range(config.agent.total_steps - 1):
-        #    action = agent.run_step(state, epsilon)
-        #    observation, reward, alive = env.update(action)
-        #    total_reward += reward
-        #    next_state = preprocess(observation)
-        #    transition = {'state': state,
-        #                  'action': action,
-        #                  'reward': reward,
-        #                  'next_state': next_state}
-        #    replayBuffer.add(transition)
-
-        #    if replayBuffer.population > config.agent.batch_size:
-        #        batch_size = config.agent.batch_size
-        #    else:
-        #        batch_size = replayBuffer.population
-        #    batch = replayBuffer.get_batch(batch_size)
-        #    agent.update(batch)
-
-        #    state = next_state
-        #    if not alive:
-        #        break
-        #if not mute:
-        #    if alive:
-        #        logger.info('failed')
-        #    logger.info('total_reward this episode: {}'.format(total_reward))
-        #    logger.info(step)
-        # ----Old version, end.----
-
     def distill_agent_one_lesson(self, agent_t, agent_s, env, replayBuffer,
                                  epsilon, mute=False):
         # NOTE: We call M timesteps as an episode. Because the length of an
@@ -378,26 +340,8 @@ class Trainer():
 
         config = self.config
 
-        if env.current_state is None:
-            env.reset_game_art()
-            env.set_goal_position()
-            env.set_init_position()
-            observation, _, _ = \
-                env.init_episode(config.emulator.display_flag)
-            state = preprocess(observation)
-        else:
-            state = env.current_state
-
+        # ----do not sample new transitions----
         for step in range(config.agent.lesson_length):
-            action = agent_t.run_step(state, epsilon)
-            observation, reward, alive = env.update(action)
-            next_state = preprocess(observation)
-            transition = {'state': state,
-                          'action': action,
-                          'reward': reward,
-                          'next_state': next_state}
-            replayBuffer.add(transition)
-
             if replayBuffer.population > config.agent.batch_size:
                 batch = replayBuffer.get_batch(config.agent.batch_size)
                 q_expert = agent_t.calc_q_value(batch['state'])
@@ -406,31 +350,19 @@ class Trainer():
                 if agent_s.update_steps % config.agent.synchronize_frequency == 0:
                     agent_s.sync_net()
 
-            state = next_state
-            if not alive:
-                # ----One episode finished, start another.----
-                env.reset_game_art()
-                env.set_goal_position()
-                env.set_init_position()
-                obervation, _, _ = \
-                    env.init_episode(config.emulator.display_flag)
-                state = preprocess(observation)
-        env.current_state = state
+        #if env.current_state is None:
+        #    env.reset_game_art()
+        #    env.set_goal_position()
+        #    env.set_init_position()
+        #    observation, _, _ = \
+        #        env.init_episode(config.emulator.display_flag)
+        #    state = preprocess(observation)
+        #else:
+        #    state = env.current_state
 
-        # ----Old version, process a total episode at a time.----
-        #env.reset_game_art()
-        #env.set_goal_position()
-        #env.set_init_position()
-        #observation, reward, _ =\
-        #    env.init_episode(config.emulator.display_flag)
-        #state = preprocess(observation)
-
-        #total_reward = 0
-        ## ----Running one episode.----
-        #for step in range(config.agent.total_steps):
+        #for step in range(config.agent.lesson_length):
         #    action = agent_t.run_step(state, epsilon)
         #    observation, reward, alive = env.update(action)
-        #    total_reward += reward
         #    next_state = preprocess(observation)
         #    transition = {'state': state,
         #                  'action': action,
@@ -439,23 +371,23 @@ class Trainer():
         #    replayBuffer.add(transition)
 
         #    if replayBuffer.population > config.agent.batch_size:
-        #        batch_size = config.agent.batch_size
-        #    else:
-        #        batch_size = replayBuffer.population
-        #    batch = replayBuffer.get_batch(batch_size)
-        #    q_expert = agent_t.calc_q_value(batch['state'])
-        #    batch['q_expert'] = q_expert
-        #    agent_s.update_distill(batch)
-        #    if agent_s.update_steps % config.agent.synchronize_frequency == 0:
-        #        agent_s.sync_net()
+        #        batch = replayBuffer.get_batch(config.agent.batch_size)
+        #        q_expert = agent_t.calc_q_value(batch['state'])
+        #        batch['q_expert'] = q_expert
+        #        agent_s.update_distill(batch)
+        #        if agent_s.update_steps % config.agent.synchronize_frequency == 0:
+        #            agent_s.sync_net()
+
         #    state = next_state
         #    if not alive:
-        #        break
-        #if not mute:
-        #    if alive:
-        #        logger.info('failed')
-        #    logger.info('total_reward this episode: {}'.format(total_reward))
-        # ----Old version, end.----
+        #        # ----One episode finished, start another.----
+        #        env.reset_game_art()
+        #        env.set_goal_position()
+        #        env.set_init_position()
+        #        obervation, _, _ = \
+        #            env.init_episode(config.emulator.display_flag)
+        #        state = preprocess(observation)
+        #env.current_state = state
 
     def test(self, load_model, ckpt_num=None):
         config = self.config
