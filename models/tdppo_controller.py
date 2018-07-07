@@ -175,3 +175,65 @@ class LSTMPPO(BasePPO):
 
     def build_critic_net(self, scope):
         pass
+
+
+class CNNPPO(BasePPO):
+    def __init(self, config, sess, exp_name='CNNPPO'):
+        super(CNNPPO, self).__init__(config, sess, exp_name)
+        with tf.variable_scope(exp_name):
+            self._build_placeholder()
+            self._build_graph()
+
+    def build_actor_net(self, scope, trainable):
+        x = self.state
+        with tf.variable_scope(scope):
+            with tf.variable_scope('conv_block'):
+                filters = [16, 32, 64, 64]
+                kernel_sizes = [1, 1, 3, 4]
+                strides = [1, 1, 2, 2]
+                for i in range(len(filters)):
+                    x = tf.layers.conv2d(inputs=x,
+                                         filters=filters[i],
+                                         kernel_size=kernel_sizes[i],
+                                         strides=(strides[i], strides[i]),
+                                         padding='valid',
+                                         activation=tf.nn.leaky_relu,
+                                         name='conv2d_{}'.format(i))
+            x = tf.layers.flatten(inputs=x, name='flatten')
+            self.cnn_features = x
+
+            with tf.variable_scope('fc_block'):
+                units = [128, 8]
+                for i in range(len(units)):
+                    x = tf.layers.dense(inputs=x,
+                                        units=units[i],
+                                        activation=tf.nn.leaky_relu,
+                                        name='fc_{}'.format(i))
+                logits = tf.layers.dense(inputs=x,
+                                         units=4,
+                                         activation=None,
+                                         name='fc_2')
+
+            output = tf.nn.softmax(logits * self.config.meta.logits_scale)
+            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                      '{}/{}'.format(self.exp_name, scope))
+            return output, param
+
+    def build_critic_net(self, scope):
+        x = self.cnn_features
+        with tf.variable_scope(scope):
+            units = [128, 32]
+            for i in range(len(units)):
+                x = tf.layers.dense(inputs=x,
+                                    units=units[i],
+                                    activation=tf.nn.leaky_relu,
+                                    name='fc_{}'.format(i))
+            value = tf.layers.dense(inputs=x,
+                                    units=1,
+                                    activation=tf.tanh,
+                                    name='fc_2')
+            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                      '{}/{}'.format(self.exp_name, scope))
+            return value, param
+
+

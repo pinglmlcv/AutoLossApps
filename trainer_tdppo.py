@@ -12,7 +12,7 @@ import socket
 from time import gmtime, strftime
 import time
 
-from models import ppo_controller
+from models import tdppo_controller
 from models import controller
 from models import two_rooms
 from models import gridworld_agent
@@ -57,241 +57,53 @@ class Trainer():
         configProto = tf.ConfigProto(gpu_options=gpu_options)
         self.sess = tf.InteractiveSession(config=configProto)
         self.auc_baseline = None
-        # ----single agent----
-        #self.env = two_rooms.Env2Rooms(config, default_init=(3, 3))
-        #self.agent = gridworld_agent.AgentGridWorld(config,
-        #                                       self.sess,
-        #                                       exp_name=exp_name+'/agent1')
 
-        # ----multi agents----
         if config.meta.controller == 'designed':
             self.controller = controller.Controller(config, self.sess,
                 exp_name=exp_name+'/controller')
         elif config.meta.controller == 'MlpPPO':
             self.controller = ppo_controller.MlpPPO(config, self.sess,
                 exp_name=exp_name+'/controller')
+        elif config.meta.controller == 'CNNPPO':
+            self.controller = tdppo_controller.CNNPPO(config, self.sess,
+                exp_name=exp_name+'/controller')
         else:
             raise Exception('Invalid controller name')
 
-        self.env_list = []
-        self.agent_list = []
-        #optional_goals = [(2, 1),
-        #                  (2, 5),
-        #                  (6, 1),
-        #                  (6, 5),
-        #                  (2, 14),
-        #                  (2, 18),
-        #                  (6, 14),
-        #                  (6, 18),
-        #                  (4, 10)]
-        #optional_goals = [(3, 3),
-        #                  (5, 17)]
-        optional_goals = [(3, 3)]
+        self.env = two_rooms.Env2Rooms(config, default_goal=(3, 3))
 
-        for goal in optional_goals:
-            self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
-        self.env_list.append(two_rooms.Env2Rooms(config,
-                                                 optional_goals=optional_goals))
-
-        for i in range(len(optional_goals) + 1):
-            self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                   self.sess,
-                                   exp_name='{}/agent{}'.format(exp_name, i)))
-        self.target_agent_id = len(self.agent_list) - 1
-
-    def train_meta(self, load_model=None, save_model=False):
+    def train(self, load_model=None, save_model=False):
         config = self.config
         controller = self.controller
-        replayBufferMeta = replaybuffer.ReplayBuffer(config.meta.buffer_size)
-        # ----The epsilon decay schedule.----
-        epsilons = np.linspace(config.agent.epsilon_start,
-                               config.agent.epsilon_end,
-                               config.agent.epsilon_decay_steps)
-        nAgent = self.target_agent_id + 1
+        keys = ['state', 'action', 'reward', 'target_value', 'next_state']
+        replayBuffer = replaybuffer.ReplayBuffer(config.agent.buffer_size,
+                                                 keys=keys)
 
         # ----Initialize performance matrix.----
         controller.initialize_weights()
         if load_model:
             controller.load_model(load_model)
-        for agent in self.agent_list:
-            agent.initialize_weights()
-        performance_matrix_init = np.zeros((nAgent, nAgent,
-                                            config.agent.total_episodes + 1))
-        for i in range(nAgent):
-            for j in range(nAgent):
-                performance_matrix_init[i, j, 0] = \
-                    self.test_agent(self.agent_list[i], self.env_list[j])
 
-        for ep_meta in range(config.meta.total_episodes):
-            logger.info('######## meta_episodes {} #########'.format(ep_meta))
+        for ep in range(config.agent.total_episodes):
+            logger.info('######## episodes {} #########'.format(ep))
             start_time = time.time()
-            replayBufferAgent_list = []
-            for i in range(len(self.agent_list)):
-                replayBufferAgent_list.append(
-                    replaybuffer.ReplayBuffer(config.agent.buffer_size))
+            self.train_agent_one_lesson(controller,
+                                        self.env,
+                                        replayBuffer,
+                                        epsilon,
+                                        mute=config.agent.mute)
 
-            # ----Initialize agents.----
-            for agent in self.agent_list:
-                agent.initialize_weights()
+        self.test_agent(self.controller,
+                        self.env,
+                        num_episodes=100,
+                        mute=False)
 
-            # NOTE: `ep_agent` records how many episodes an agent has been
-            # updated for
-            ep_agent = [0] * len(self.agent_list)
-
-            # ----Initialize performance matrix and lesson probability.----
-            performance_matrix = performance_matrix_init.copy()
-            lesson_history = []
-            lesson_prob = self.calc_lesson_prob(lesson_history)
-            meta_transitions = []
-            target_agent_performance = []
-
-            # ----Start a meta episode.----
-            # curriculum content:
-            #   0: train agent0
-            #   1: train agent1
-            #   2: train agent2
-            #   3: distill from agent0 to agent2
-            #   4: distill from agent1 to agent2
-
-            # NOTE: We call M timesteps as an episode. Because the length of an
-            # episode is unfixed so the training steps of each lesson is
-            # different if we use a true episode as a lesson.
-            for ep in range(config.agent.total_episodes):
-                meta_state = self.get_meta_state(performance_matrix[:, :, ep],
-                                                 lesson_prob)
-                meta_action, pi = controller.run_step(meta_state, ep)
-                logger.info(pi)
-                lesson = meta_action
-                if not config.agent.mute:
-                    logger.info('=================')
-                    logger.info('episodes: {}, lesson: {}'.format(ep, lesson))
-
-                if lesson < nAgent:
-                    student = lesson
-                    epsilon = epsilons[min(ep_agent[student],
-                                           config.agent.epsilon_decay_steps-1)]
-                    self.train_agent_one_lesson(self.agent_list[student],
-                                                self.env_list[student],
-                                                replayBufferAgent_list[student],
-                                                epsilon,
-                                                mute=config.agent.mute)
-                    ep_agent[student] += 1
-                else:
-                    # TODO: For brevity, we use the expert net to sample actions.
-                    # Previous study showed that sampling actions from student
-                    # net gives a better result, we might try it later.
-                    teacher = lesson - nAgent
-                    student = nAgent - 1
-                    epsilon = epsilons[min(ep_agent[teacher],
-                                           config.agent.epsilon_decay_steps-1)]
-                    self.distill_agent_one_lesson(self.agent_list[teacher],
-                                                  self.agent_list[student],
-                                                  self.env_list[teacher],
-                                                  replayBufferAgent_list[teacher],
-                                                  epsilon,
-                                                  mute=config.agent.mute)
-                    ep_agent[student] += 1
-
-                # ----Update performance matrix.----
-                mask = np.zeros((nAgent, nAgent), dtype=int)
-                mask[student] = 1
-                self.update_performance_matrix(performance_matrix, ep, mask)
-                meta_reward = self.get_meta_reward_real_time(
-                    performance_matrix, ep)
-
-                #logger.info('performance_matrix: {}'.format(performance_matrix[:, :, ep+1]))
-
-                #if ep_agent[student] % config.agent.valid_frequency == 0:
-                #    logger.info('++++test agent {}++++'.format(student))
-                #    logger.info('update times: {}'.format(ep_agent[student]))
-                #    rew = []
-                #    for i in range(1):
-                #        r = self.test_agent(self.agent_list[student],
-                #                            self.env_list[student],
-                #                            mute=False)
-                #        rew.append(r)
-                #    logger.info('++++++++')
-
-
-                # NOTE: Record performance of target agent whenever it has been
-                # updated for `valid_frequency` steps. This recording is used
-                # to evaluate the meta controller.
-                # TODO: Both inefficient and inaccurate. Need to find a better
-                # evaluation method.
-                # ----option 1----
-                # if student == nAgent - 1:
-                #     if ep_agent[student] % config.agent.valid_frequency == 0:
-                #         logger.info('++++test agent {}++++'.format(student))
-                #         r = self.test_agent(self.agent_list[student],
-                #                             self.env_list[student])
-                #         target_agent_performance.append(r)
-                #         logger.info('++++++++++')
-                # ----option 2----
-                # if student == nAgent - 1:
-                #     target_agent_performance.append(
-                #         performance_matrix[-1, -1, ep + 1])
-
-                # ----Update lesson probability.----
-                lesson_history.append(lesson)
-                lesson_prob = self.calc_lesson_prob(lesson_history)
-                if ep % 20 == 0:
-                    logger.info('ep: {}, lesson_prob: {}'.format(ep, lesson_prob))
-
-                # ----Save transition.----
-                transition = {'state': meta_state,
-                              'action': meta_action,
-                              'reward': meta_reward,
-                              'next_state': 0}
-                meta_transitions.append(transition)
-
-                # ----End of an agent episode.----
-
-            self.test_agent(self.agent_list[0],
-                            self.env_list[0],
-                            num_episodes=100,
-                            mute=False)
-            self.test_agent(self.agent_list[1],
-                            self.env_list[1],
-                            num_episodes=100,
-                            mute=False)
-            # ----Calculate meta_reward_final.----
-            # TODO: Haven't found a better way to evaluate
-            # ----option 1----
-            #meta_reward = self.get_meta_reward(target_agent_performance)
-            #for t in meta_transitions:
-            #    t['reward'] = meta_reward
-            #    replayBufferMeta.add(t)
-            #logger.info(target_agent_performance)
-            #logger.info(meta_reward)
-
-            # ----option 2----
-            reward_decay(meta_transitions, config.meta.gamma)
-            for t in meta_transitions:
-                replayBufferMeta.add(t)
-
-            # ----Update controller using PPO.----
-            if ep_meta % config.meta.n_parallel_actor == 0:
-                buffer_size = min(config.meta.buffer_size,
-                                  replayBufferMeta.population)
-                for i in range(10):
-                    batch = replayBufferMeta.get_batch(buffer_size)
-                    controller.update(batch, i)
-                controller.sync_net()
-                replayBufferMeta.clear()
-
-            # ----Save contrller.----
-            if ep_meta % config.meta.save_frequency == 0:
-                controller.save_model(ep_meta)
-
-            # ----End of a meta episode.----
-            logger.info('running time: {}'.format(time.time() - start_time))
-            logger.info('#################')
+        # ----End of a meta episode.----
+        logger.info('running time: {}'.format(time.time() - start_time))
+        logger.info('#################')
 
     def train_agent_one_lesson(self, agent, env, replayBuffer, epsilon,
                                mute=False):
-        # NOTE: We use M timesteps instead of an episode. Because the length of
-        # an episode is unfixed so the training steps of each lesson is
-        # different if we use a true episode as a lesson.
         config = self.config
 
         # ----Lesson version.----
@@ -515,9 +327,7 @@ if __name__ == '__main__':
     if argv[2] == 'train':
         # ----Training----
         logger.info('TRAIN')
-        controller_ckpt = '/datasets/BigLearning/haowen/AutoLossApps/saved_models/test/controller/'
-        trainer.train_meta(save_model=False)
-        #trainer.train_meta(save_model=False, load_model=controller_ckpt)
+        trainer.train(save_model=False)
     elif argv[2] == 'test':
         ## ----Testing----
         logger.info('TEST')

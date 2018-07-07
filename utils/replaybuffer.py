@@ -7,10 +7,14 @@ import scipy
 from collections import deque
 
 class ReplayBuffer():
-    def __init__(self, buffer_size):
+    def __init__(self, buffer_size, keys=None):
         self.buffer_size = buffer_size
         self.population = 0
         self.transition_buffer = deque(maxlen=buffer_size)
+        if keys:
+            self.keys = keys
+        else:
+            self.keys = ['state', 'action', 'reward', 'next_state']
 
     def add(self, transition):
         self.transition_buffer.append(transition)
@@ -26,18 +30,11 @@ class ReplayBuffer():
             raise Exception('buffer has less data point than'
                             'batchsize {}'.format(batch_size))
         batch = random.sample(self.transition_buffer, batch_size)
-        state = []
-        reward = []
-        action = []
-        next_state = []
+        out_batch = {}
+        for key in self.keys:
+            out_batch[key] = []
         for t in batch:
-            state.append(t['state'])
-            reward.append(t['reward'])
-            action.append(t['action'])
-            next_state.append(t['next_state'])
-        batch = {'state': state,
-                 'reward': reward,
-                 'action': action,
-                 'next_state': next_state}
-        return batch
+            for key in self.keys:
+                out_batch[key].append(t[key])
 
+        return out_batch
