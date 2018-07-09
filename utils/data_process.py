@@ -13,3 +13,13 @@ def preprocess(ob):
     state = state - 0.5
     return state
 
+def vector_preprocess(ob):
+    state = []
+    player_coords = get_coords(ob.layers['P'])
+    reward_coords = get_coords(ob.layers['$'])
+    state.append(player_coords[0])
+    state.append(player_coords[1])
+    state.append(reward_coords[0])
+    state.append(reward_coords[1])
+    return state
+

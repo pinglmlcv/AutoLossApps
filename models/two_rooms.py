@@ -101,7 +101,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.02)
+            the_plot.add_reward(-0.1)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -162,10 +162,11 @@ class Env2Rooms():
         self.game_art = modify_art(self.game_art, init, 'P')
 
 
-    def update(self, action):
+    def update(self, action, display=None):
         self.time_steps += 1
         if self.display_flag:
-            observation, reward, discount = self.ui.update(action)
+            observation, reward, discount = self.ui.update(action,
+                                                           display=display)
         else:
             observation, reward, discount = self.game.play(action)
         # ----Terminate when timestep exceeds a limit
