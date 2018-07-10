@@ -11,17 +11,20 @@ import math
 import socket
 from time import gmtime, strftime
 import time
+import random
+from collections import deque
 
 from models import tdppo_controller
 from models import controller
 from models import two_rooms
 from models import gridworld_agent
-import gym
 import utils
 from utils import replaybuffer
 from utils.data_process import preprocess
 
 root_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(root_path, 'lib/gym'))
+import gym
 logger = utils.get_logger()
 
 def area_under_curve(curve, strategy='square'):
@@ -59,6 +62,25 @@ class MlpPPO(tdppo_controller.BasePPO):
             self._build_placeholder()
             self._build_graph()
 
+    def _build_placeholder(self):
+        config = self.config.agent
+        dim_s = config.dim_s
+        with tf.variable_scope('placeholder'):
+            self.state = tf.placeholder(tf.float32,
+                                        shape=[None, dim_s],
+                                        name='state')
+            self.action = tf.placeholder(tf.int32, shape=[None],
+                                         name='action')
+            self.reward = tf.placeholder(tf.float32, shape=[None],
+                                         name='reward')
+            self.next_value = tf.placeholder(tf.float32,
+                                             shape=[None],
+                                             name='next_value')
+            self.target_value = tf.placeholder(tf.float32,
+                                               shape=[None],
+                                               name='target_value')
+            self.lr = tf.placeholder(tf.float32, name='learning_rate')
+
     def build_actor_net(self, scope, trainable):
         with tf.variable_scope(scope):
             dim_h = 20
@@ -90,27 +112,32 @@ class MlpPPO(tdppo_controller.BasePPO):
                 inputs=self.state,
                 num_outputs=dim_h,
                 activation_fn=tf.nn.tanh,
-                trainable=trainable,
                 scope='fc1')
 
             value = tf.contrib.layers.fully_connected(
                 inputs=hidden,
                 num_outputs=1,
                 activation_fn=None,
-                trainable=trainable,
                 scope='fc2')
+            value = tf.squeeze(value)
 
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
 
     def run_step(self, states, epsilon=0):
-        if randomo.random() < epsilon:
+        dim_a = self.config.agent.dim_a
+        if random.random() < epsilon:
             return random.randint(0, self.config.agent.dim_a - 1), 0
         else:
-            pi = self.sess.run(self.pi, {self.state: state})[0]
-            action = np.random.choice(dim_a, 1, p=p1)[0]
+            pi = self.sess.run(self.pi, {self.state: states})[0]
+            action = np.random.choice(dim_a, 1, p=pi)[0]
             return action, pi
+
+    def get_value(self, state):
+        feed_dict = {self.state: state}
+        value = self.sess.run(self.value, feed_dict)
+        return value
 
 
 class Trainer():
@@ -130,6 +157,10 @@ class Trainer():
         self.sess = tf.InteractiveSession(config=configProto)
         self.auc_baseline = None
 
+        self.env = gym.make('Acrobot-v1')
+        self.config.agent.dim_a = self.env.action_space.n
+        self.config.agent.dim_s = self.env.observation_space.shape[0]
+
         if config.meta.controller == 'designed':
             self.controller = controller.Controller(config, self.sess,
                 exp_name=exp_name+'/controller')
@@ -145,14 +176,12 @@ class Trainer():
         #self.env = two_rooms.Env2Rooms(config, default_goal=(3, 3),
         #                               default_init=(7, 5))
         #self.env = two_rooms.Env2Rooms(config, default_goal=(3, 3))
-        self.env = gym.make('Acrobot-v1')
-        self.config.agent.dim_a = self.env.action_space.n
-        self.config.agent.dim_s = self.env.observation_space.shape[0]
 
     def train(self, load_model=None, save_model=False):
         config = self.config
         controller = self.controller
         self.no_reward_since = 0
+        self.episode_history = deque(maxlen=100)
         keys = ['state', 'next_state', 'reward', 'action', 'target_value']
         replayBuffer = replaybuffer.ReplayBuffer(config.agent.buffer_size,
                                                  keys=keys)
@@ -176,16 +205,19 @@ class Trainer():
                                             epsilon,
                                             mute=config.agent.mute)
 
-            if ep % 5 == 0:
-                logger.info('--test ep{}--'.format(ep))
-                self.test_agent(self.controller,
-                                self.env,
-                                num_episodes=100,
-                                mute=False)
-                logger.info('----')
+            #if ep % 5 == 0:
+            #    logger.info('--test ep{}--'.format(ep))
+            #    self.test_agent(self.controller,
+            #                    self.env,
+            #                    num_episodes=100,
+            #                    mute=False)
+            #    logger.info('----')
 
             if ep % 5 == 0:
                 controller.save_model(ep)
+            mean_reward = np.mean(self.episode_history)
+            if mean_reward >= -100:
+                break
 
         # ----End of a meta episode.----
         logger.info('running time: {}'.format(time.time() - start_time))
@@ -244,7 +276,7 @@ class Trainer():
             batch_size = min(replayBuffer.population, config.agent.batch_size)
             batch = replayBuffer.get_batch(batch_size)
             next_value = agent.get_value(batch['next_state'])
-            batch['next_value'] = next_value[:, 0]
+            batch['next_value'] = next_value
             agent.update_actor(batch)
 
             # update critic
@@ -269,12 +301,15 @@ class Trainer():
 
         # ----Lesson version.----
         state = env.reset()
-        total_reward = 0
+        total_rewards = 0
 
         for step in range(config.agent.lesson_length):
-            env.render()
-            action, _ = agent.run_step(state[np.newaxis,:], epsilon)
-            next_state, reward, done, _ = env.update(action)
+            #env.render()
+            action, _ = agent.run_step(state[np.newaxis, :], epsilon)
+            next_state, reward, done, _ = env.step(action)
+            #value = agent.get_value([state])
+            #logger.info(pi)
+            #logger.info(value)
 
             total_rewards += reward
             reward = 5.0 if done else -0.1
@@ -292,7 +327,7 @@ class Trainer():
                     replayBuffer.add(transition)
                     replayBuffer_critic.add(transition)
                 break
-        if total_reward <= -500:
+        if total_rewards <= -500:
             self.no_reward_since += 1
             if self.no_reward_since >= 5:
                 print('Resetting model... start anew!')
@@ -300,14 +335,14 @@ class Trainer():
                 self.no_reward_since = 0
                 return 0
         else:
-            no_reward_since = 0
+            self.no_reward_since = 0
 
-        for i in range(10):
+        for i in range(20):
             # update actor
             batch_size = min(replayBuffer.population, config.agent.batch_size)
             batch = replayBuffer.get_batch(batch_size)
             next_value = agent.get_value(batch['next_state'])
-            batch['next_value'] = next_value[:, 0]
+            batch['next_value'] = next_value
             agent.update_actor(batch)
 
             # update critic
@@ -320,7 +355,8 @@ class Trainer():
         if not config.meta.one_step_td:
             replayBuffer.clear()
 
-        print(total_rewards)
+        self.episode_history.append(total_rewards)
+        print(total_rewards, np.mean(self.episode_history))
 
 
     def test(self, load_model, ckpt_num=None):

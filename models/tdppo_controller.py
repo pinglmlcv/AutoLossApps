@@ -40,7 +40,7 @@ class BasePPO(Basic_model):
                                                     trainable=False)
         pi = pi + 1e-8
         old_pi = old_pi + 1e-8
-        value, _ = self.build_critic_net('value_net')
+        value, critic_param = self.build_critic_net('value_net')
         a_indices = tf.stack([tf.range(tf.shape(self.action)[0], dtype=tf.int32),
                               self.action], axis=1)
         pi_wrt_a = tf.gather_nd(params=pi, indices=a_indices, name='pi_wrt_a')
@@ -54,8 +54,12 @@ class BasePPO(Basic_model):
         # NOTE: Stop passing gradient through adv
         adv = tf.stop_gradient(adv, name='critic_adv_stop_gradient')
         with tf.variable_scope('critic_loss'):
-            self.critic_loss = -tf.reduce_mean(adv * value)
-            #self.critic_loss = tf.reduce_mean(tf.square(self.target_value - value))
+            critic_reg_loss = tf.reduce_sum([tf.reduce_sum(tf.square(x))
+                                              for x in critic_param])
+            #mse_loss = -tf.reduce_mean(adv * value)
+            mse_loss = tf.reduce_mean(tf.square(self.target_value - value))
+            self.critic_loss = mse_loss + 0.001 * critic_reg_loss
+
 
         if self.config.meta.one_step_td:
             adv = self.reward + gamma * self.next_value - value
@@ -69,10 +73,15 @@ class BasePPO(Basic_model):
             pg_losses2 = adv * tf.clip_by_value(ratio,
                                                 1.0 - cliprange,
                                                 1.0 + cliprange)
-            entropy = -tf.reduce_mean(tf.reduce_sum(pi * tf.log(pi), 1))
+            entropy_loss = -tf.reduce_mean(tf.reduce_sum(pi * tf.log(pi), 1))
+            actor_reg_loss = tf.reduce_sum([tf.reduce_sum(tf.square(x))
+                                            for x in pi_param])
+            pg_loss = -tf.reduce_mean(tf.minimum(pg_losses1, pg_losses2))
             beta = self.config.meta.entropy_bonus_beta
-            self.actor_loss = -tf.reduce_mean(tf.minimum(
-                pg_losses1, pg_losses2)) + beta * entropy
+            reg_param = 0.001
+            self.actor_loss = pg_loss + beta * entropy_loss +\
+                reg_param * actor_reg_loss
+
 
         self.sync_op = [tf.assign(oldp, p)
                         for oldp, p in zip(old_pi_param, pi_param)]
@@ -119,13 +128,13 @@ class BasePPO(Basic_model):
         action = transition_batch['action']
         reward = transition_batch['reward']
         target_value = transition_batch['target_value']
-        fetch = [self.train_op_critic, self.check_value]
+        fetch = [self.train_op_critic]
         feed_dict = {self.state: state,
                      self.action: action,
                      self.reward: reward,
                      self.target_value: target_value,
                      self.lr: lr}
-        _, check_value = self.sess.run(fetch, feed_dict)
+        _ = self.sess.run(fetch, feed_dict)
         tvar = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                  '{}/value_net/fc_2'.format(self.exp_name))
         #self.print_weights(tvar)
@@ -200,6 +209,8 @@ class MlpPPO(BasePPO):
                 num_outputs=1,
                 activation_fn=None,
                 scope='fc2')
+
+            value = tf.squeeze(value)
 
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
@@ -303,6 +314,7 @@ class CNNPPO(BasePPO):
                                         units=1,
                                         activation=None,
                                         name='fc_2')
+                value = tf.squeeze(value)
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
