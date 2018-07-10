@@ -69,6 +69,7 @@ class MyUi(human_ui.CursesUi):
 
     def update(self, action, display=None):
         self.action = action
+        self.display = display
         curses.wrapper(self._update)
         return self.observation, self.reward, self.discount
 
@@ -96,8 +97,8 @@ class MyUi(human_ui.CursesUi):
             self._total_return += reward
 
         elapsed = datetime.datetime.now() - self._start_time
-        self._display(screen, observations, self._total_return, elapsed)
-        #self._display(screen, observations, self.display, elapsed)
+        #self._display(screen, observations, self._total_return, elapsed)
+        self._display(screen, observations, self.display, elapsed)
         self._update_game_console(
             plab_logging.consume(self._game.the_plot), self.console,
             self.paint_console)

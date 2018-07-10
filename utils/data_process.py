@@ -10,7 +10,7 @@ def preprocess(ob):
     state.append(np.array(ob.layers['$'], dtype=float))
     state = np.array(state)
     state = np.transpose(state, (1, 2, 0))
-    state = state - 0.5
+    state = state - 0.1
     return state
 
 def vector_preprocess(ob):

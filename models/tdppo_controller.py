@@ -49,15 +49,20 @@ class BasePPO(Basic_model):
 
         cliprange = self.config.meta.cliprange
         gamma = self.config.agent.gamma
-        #adv = self.reward + gamma * self.next_value - value
+
         adv = self.target_value - value
         # NOTE: Stop passing gradient through adv
-        adv = tf.stop_gradient(adv, name='adv_stop_gradient')
-
+        adv = tf.stop_gradient(adv, name='critic_adv_stop_gradient')
         with tf.variable_scope('critic_loss'):
             self.critic_loss = -tf.reduce_mean(adv * value)
             #self.critic_loss = tf.reduce_mean(tf.square(self.target_value - value))
 
+        if self.config.meta.one_step_td:
+            adv = self.reward + gamma * self.next_value - value
+        else:
+            adv = self.target_value - value
+        # NOTE: Stop passing gradient through adv
+        adv = tf.stop_gradient(adv, name='actor_adv_stop_gradient')
         with tf.variable_scope('actor_loss'):
             ratio = pi_wrt_a / old_pi_wrt_a
             pg_losses1 = adv * ratio
@@ -71,7 +76,7 @@ class BasePPO(Basic_model):
 
         self.sync_op = [tf.assign(oldp, p)
                         for oldp, p in zip(old_pi_param, pi_param)]
-        optimizer1 = tf.train.AdamOptimizer(self.lr)
+        optimizer1= tf.train.AdamOptimizer(self.lr)
         optimizer2 = tf.train.AdamOptimizer(self.lr)
         self.train_op_actor = optimizer1.minimize(self.actor_loss)
         self.train_op_critic = optimizer2.minimize(self.critic_loss)
@@ -105,24 +110,50 @@ class BasePPO(Basic_model):
         self.sess.run(self.sync_op)
         logger.info('{}: target_network synchronized'.format(self.exp_name))
 
-    def update(self, transition_batch, fi=0):
+    def update_critic(self, transition_batch, fi=0):
         self.update_steps += 1
+        lr = self.config.agent.lr
+        if self.update_steps == 2000:
+            lr /= 10
+        state = transition_batch['state']
+        action = transition_batch['action']
+        reward = transition_batch['reward']
+        target_value = transition_batch['target_value']
+        fetch = [self.train_op_critic, self.check_value]
+        feed_dict = {self.state: state,
+                     self.action: action,
+                     self.reward: reward,
+                     self.target_value: target_value,
+                     self.lr: lr}
+        _, check_value = self.sess.run(fetch, feed_dict)
+        tvar = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
+                                 '{}/value_net/fc_2'.format(self.exp_name))
+        #self.print_weights(tvar)
+        #if self.update_steps % 50 == 0:
+        #    for i in range(5):
+        #        print(check_value[i], target_value[i])
+
+    def update_actor(self, transition_batch, fi=0):
+        self.update_steps += 1
+        lr = self.config.agent.lr
+        if self.update_steps == 2000:
+            lr /= 10
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
         next_value = transition_batch['next_value']
         target_value = transition_batch['target_value']
-        fetch = [self.train_op_actor, self.train_op_critic, self.value]
+        #for nv, tv in zip(next_value, target_value):
+        #    print(nv, tv)
+
+        fetch = [self.train_op_actor]
         feed_dict = {self.state: state,
                      self.action: action,
                      self.next_value: next_value,
                      self.reward: reward,
                      self.target_value: target_value,
-                     self.lr: self.config.agent.lr}
-        _, _, value = self.sess.run(fetch, feed_dict)
-        if fi == -1:
-            for i in range(60):
-                logger.info('value: {}, target_value: {}'.format(value[i], target_value[i]))
+                     self.lr: lr}
+        self.sess.run(fetch, feed_dict)
 
 
 class MlpPPO(BasePPO):
@@ -218,6 +249,7 @@ class CNNPPO(BasePPO):
                                          strides=(strides[i], strides[i]),
                                          padding='valid',
                                          activation=tf.nn.leaky_relu,
+                                         trainable=trainable,
                                          name='conv2d_{}'.format(i))
             x = tf.layers.flatten(inputs=x, name='flatten')
             self.cnn_features = x
@@ -228,10 +260,12 @@ class CNNPPO(BasePPO):
                     x = tf.layers.dense(inputs=x,
                                         units=units[i],
                                         activation=tf.nn.leaky_relu,
+                                        trainable=trainable,
                                         name='fc_{}'.format(i))
                 logits = tf.layers.dense(inputs=x,
                                          units=4,
                                          activation=None,
+                                         trainable=trainable,
                                          name='fc_2')
 
             output = tf.nn.softmax(logits * self.config.meta.logits_scale)
@@ -240,6 +274,7 @@ class CNNPPO(BasePPO):
             return output, param
 
     def build_critic_net(self, scope):
+        #x = self.cnn_features
         x = self.state
         with tf.variable_scope(scope):
             with tf.variable_scope('conv_block'):
@@ -255,16 +290,19 @@ class CNNPPO(BasePPO):
                                          activation=tf.nn.leaky_relu,
                                          name='conv2d_{}'.format(i))
             x = tf.layers.flatten(inputs=x, name='flatten')
-            units = [64, 8]
-            for i in range(len(units)):
-                x = tf.layers.dense(inputs=x,
-                                    units=units[i],
-                                    activation=tf.nn.leaky_relu,
-                                    name='fc_{}'.format(i))
-            value = tf.layers.dense(inputs=x,
-                                    activation=None,
-                                    units=1,
-                                    name='fc_2')
+
+            with tf.variable_scope('fc_block'):
+                units = [64, 8]
+                for i in range(len(units)):
+                    x = tf.layers.dense(inputs=x,
+                                        units=units[i],
+                                        activation=tf.nn.leaky_relu,
+                                        name='fc_{}'.format(i))
+                self.check_value = x
+                value = tf.layers.dense(inputs=x,
+                                        units=1,
+                                        activation=None,
+                                        name='fc_2')
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
@@ -273,5 +311,4 @@ class CNNPPO(BasePPO):
         feed_dict = {self.state: state}
         value = self.sess.run(self.value, feed_dict)
         return value
-
 
