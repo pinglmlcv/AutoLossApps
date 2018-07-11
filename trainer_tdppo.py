@@ -44,16 +44,6 @@ def reward_decay(transitions, gamma):
     for i in range(len(transitions) - 2, -1, -1):
         transitions[i]['target_value'] += transitions[i+1]['target_value'] * gamma
 
-    # TODO Set arbitory supervision to see if the critic network can predict
-    #for i in range(len(transitions)):
-    #    s = transitions[i]['state'][:, :, 1]
-    #    p = np.where(s == np.max(s))
-    #    value = p[0] + p[1]
-    #    transitions[i]['target_value'] = value[0]
-
-    #for i in range(len(transitions)):
-    #    print(transitions[i]['target_value'])
-
 
 class MlpPPO(tdppo_controller.BasePPO):
     def __init__(self, config, sess, exp_name='MlpPPO'):

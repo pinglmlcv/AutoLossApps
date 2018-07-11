@@ -101,7 +101,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.1)
+            the_plot.add_reward(-0.02)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.

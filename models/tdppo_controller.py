@@ -119,11 +119,8 @@ class BasePPO(Basic_model):
         self.sess.run(self.sync_op)
         logger.info('{}: target_network synchronized'.format(self.exp_name))
 
-    def update_critic(self, transition_batch, fi=0):
+    def update_critic(self, transition_batch, lr=0.001):
         self.update_steps += 1
-        lr = self.config.agent.lr
-        if self.update_steps == 2000:
-            lr /= 10
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
@@ -142,11 +139,8 @@ class BasePPO(Basic_model):
         #    for i in range(5):
         #        print(check_value[i], target_value[i])
 
-    def update_actor(self, transition_batch, fi=0):
+    def update_actor(self, transition_batch, lr=0.001):
         self.update_steps += 1
-        lr = self.config.agent.lr
-        if self.update_steps == 2000:
-            lr /= 10
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
