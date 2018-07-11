@@ -73,6 +73,7 @@ class Parser(object):
         meta.add('n_parallel_actor', self.config.getint('meta', 'n_parallel_actor'))
         meta.add('entropy_bonus_beta', self.config.getfloat('meta', 'entropy_bonus_beta_meta'))
         meta.add('one_step_td', self.config.getboolean('meta', 'one_step_td'))
+        meta.add('warmup_steps', self.config.getint('meta', 'warmup_steps_meta'))
 
         return meta
 

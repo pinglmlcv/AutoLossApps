@@ -26,9 +26,6 @@ class BasePPO(Basic_model):
                                          name='action')
             self.reward = tf.placeholder(tf.float32, shape=[None],
                                          name='reward')
-            self.next_value = tf.placeholder(tf.float32,
-                                             shape=[None],
-                                             name='next_value')
             self.target_value = tf.placeholder(tf.float32,
                                                shape=[None],
                                                name='target_value')
@@ -143,15 +140,11 @@ class BasePPO(Basic_model):
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']
-        next_value = transition_batch['next_value']
         target_value = transition_batch['target_value']
-        #for nv, tv in zip(next_value, target_value):
-        #    print(nv, tv)
 
         fetch = [self.train_op_actor]
         feed_dict = {self.state: state,
                      self.action: action,
-                     self.next_value: next_value,
                      self.reward: reward,
                      self.target_value: target_value,
                      self.lr: lr}

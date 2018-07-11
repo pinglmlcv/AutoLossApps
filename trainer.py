@@ -61,9 +61,6 @@ class MlpPPO(tdppo_controller.BasePPO):
                                          name='action')
             self.reward = tf.placeholder(tf.float32, shape=[None],
                                          name='reward')
-            self.next_value = tf.placeholder(tf.float32,
-                                             shape=[None],
-                                             name='next_value')
             self.target_value = tf.placeholder(tf.float32,
                                                shape=[None],
                                                name='target_value')
@@ -113,7 +110,7 @@ class MlpPPO(tdppo_controller.BasePPO):
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
 
-    def run_step(self, states, epsilon=0):
+    def run_step(self, states, ep, epsilon=0):
         dim_a = self.config.meta.dim_a
         if random.random() < epsilon:
             return random.randint(0, self.config.meta.dim_a - 1), 0
@@ -167,13 +164,28 @@ class Trainer():
         #                  (4, 10)]
         #optional_goals = [(3, 3),
         #                  (5, 17)]
-        optional_goals = [(3, 3)]
-
-        for goal in optional_goals:
-            self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
+        #optional_goals = [(4, 10)]
+        #for goal in optional_goals:
+        #    self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
+        optional_goals = [(4, 3),
+                          (5, 15),
+                          (4, 10)]
+        self.env_list.append(two_rooms.Env2Rooms(config,
+                                                 optional_goals=optional_goals))
+        optional_goals = [(2, 1),
+                          (2, 5),
+                          (6, 1),
+                          (6, 5),
+                          (2, 14),
+                          (2, 18),
+                          (6, 14),
+                          (6, 18),
+                          (4, 10)]
+        #self.env_list.append(two_rooms.Env2Rooms(config))
         self.env_list.append(two_rooms.Env2Rooms(config,
                                                  optional_goals=optional_goals))
 
+        optional_goals = [(4, 10)]
         for i in range(len(optional_goals) + 1):
             self.agent_list.append(gridworld_agent.AgentGridWorld(config,
                                    self.sess,
@@ -239,7 +251,7 @@ class Trainer():
             meta_state = self.get_meta_state(performance_matrix[:, :, 0],
                                              lesson_prob)
             for ep in range(config.agent.total_episodes):
-                meta_action, pi = controller.run_step([meta_state], 0)
+                meta_action, pi = controller.run_step([meta_state], ep, 0)
                 logger.info(pi)
                 lesson = meta_action
                 if not config.agent.mute:
@@ -335,31 +347,34 @@ class Trainer():
 
             # ----Update controller using PPO.----
             lr = config.meta.lr
-            if controller.update_steps == 2000:
+            if controller.update_steps == 200:
                 lr /= 10
 
-            if ep_meta < config.meta_warmup_steps:
+            if ep_meta < config.meta.warmup_steps or not config.meta.one_step_td:
+                # using on_policy batch if:
+                # 1) using Monte Carlo method
+                # 2) in warmup stage of one-step td method
                 batch_size = min(config.meta.batch_size,
                                  replayBufferMeta_on_policy.population)
-            for i in range(20):
-                batch = replayBufferMeta_actor.get_batch(batch_size)
-                next_value = controller.get_value(batch['next_state'])
-                batch['next_value'] = next_value
-                controller.update_actor(batch, lr)
-
-            # update critic
-            batch_size = min(config.meta.batch_size,
-                                replayBufferMeta_critic.population)
-            for i in range(10):
-                batch = replayBufferMeta_critic.get_batch(batch_size)
-                controller.update_critic(batch, lr)
+                for i in range(10):
+                    batch = replayBufferMeta_on_policy.get_batch(batch_size)
+                    controller.update_actor(batch, lr)
+                    controller.update_critic(batch, lr)
+            else:
+                # using off-policy batch if:
+                # 1) after warmup stage of one-step td method
+                batch_size = min(config.meta.batch_size,
+                                 replayBufferMeta_off_policy.population)
+                for i in range(100):
+                    batch = replayBufferMeta_off_policy.get_batch(batch_size)
+                    next_value = controller.get_value(batch['next_state'])
+                    gamma = config.meta.gamma
+                    batch['target_value'] = batch['reward'] + gamma * next_value
+                    controller.update_actor(batch, lr)
+                    controller.update_critic(batch, lr)
 
             controller.sync_net()
-            if not config.meta.one_step_td:
-                replayBufferMeta_actor.clear()
-                replayBufferMeta_critic.clear()
-            else:
-                replayBufferMeta_critic.clear()
+            replayBufferMeta_on_policy.clear()
 
             # ----Save contrller.----
             if ep_meta % config.meta.save_frequency == 0:

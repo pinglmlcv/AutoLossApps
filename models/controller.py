@@ -120,10 +120,12 @@ class Controller(Basic_model):
         #
         #lesson_period = [20, 20, 10, 10, 20, 10, 10, 50]
         #lesson_id     = [0,  1,  3,  4,  2,  3,  4,  2 ]
-        #lesson_period = [100]
-        #lesson_id     = [2  ]
-        lesson_period = [15, 15] + [1] * 3 * 10 + [40]
-        lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
+        #lesson_period = [100, 40, 30]
+        #lesson_id     = [0, 2, 1]
+        lesson_period = [30]
+        lesson_id     = [1]
+        #lesson_period = [15, 15] + [1] * 3 * 10 + [40]
+        #lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
         #lesson_period = [1]*5*100
         #lesson_id = [i for i in range(5)] * 100
 
