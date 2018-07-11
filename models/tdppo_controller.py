@@ -60,11 +60,11 @@ class BasePPO(Basic_model):
             mse_loss = tf.reduce_mean(tf.square(self.target_value - value))
             self.critic_loss = mse_loss + 0.001 * critic_reg_loss
 
-
-        if self.config.meta.one_step_td:
-            adv = self.reward + gamma * self.next_value - value
-        else:
-            adv = self.target_value - value
+        #if self.config.meta.one_step_td:
+        #    adv = self.reward + gamma * self.next_value - value
+        #else:
+        #    adv = self.target_value - value
+        adv = self.target_value - value
         # NOTE: Stop passing gradient through adv
         adv = tf.stop_gradient(adv, name='actor_adv_stop_gradient')
         with tf.variable_scope('actor_loss'):
@@ -120,7 +120,6 @@ class BasePPO(Basic_model):
         logger.info('{}: target_network synchronized'.format(self.exp_name))
 
     def update_critic(self, transition_batch, lr=0.001):
-        self.update_steps += 1
         state = transition_batch['state']
         action = transition_batch['action']
         reward = transition_batch['reward']

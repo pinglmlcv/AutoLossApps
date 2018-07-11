@@ -184,9 +184,9 @@ class Trainer():
         config = self.config
         controller = self.controller
         keys = ['state', 'next_state', 'reward', 'action', 'target_value']
-        replayBufferMeta_actor = replaybuffer.ReplayBuffer(
+        replayBufferMeta_on_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
-        replayBufferMeta_critic = replaybuffer.ReplayBuffer(
+        replayBufferMeta_off_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
         meta_training_history = deque(maxlen=10)
         # ----The epsilon decay schedule.----
@@ -330,36 +330,36 @@ class Trainer():
 
             reward_decay(meta_transitions, config.meta.gamma)
             for t in meta_transitions:
-                replayBufferMeta_actor.add(t)
-                replayBufferMeta_critic.add(t)
+                replayBufferMeta_on_policy.add(t)
+                replayBufferMeta_off_policy.add(t)
 
             # ----Update controller using PPO.----
-            if ep_meta % config.meta.n_parallel_actor == 0:
-                lr = config.meta.lr
-                if controller.update_steps == 2000:
-                    lr /= 10
-                # update actor
-                batch_size = min(config.meta.batch_size,
-                                 replayBufferMeta_actor.population)
-                for i in range(20):
-                    batch = replayBufferMeta_actor.get_batch(batch_size)
-                    next_value = controller.get_value(batch['next_state'])
-                    batch['next_value'] = next_value
-                    controller.update_actor(batch, lr)
+            lr = config.meta.lr
+            if controller.update_steps == 2000:
+                lr /= 10
 
-                # update critic
+            if ep_meta < config.meta_warmup_steps:
                 batch_size = min(config.meta.batch_size,
-                                 replayBufferMeta_critic.population)
-                for i in range(10):
-                    batch = replayBufferMeta_critic.get_batch(batch_size)
-                    controller.update_critic(batch, lr)
+                                 replayBufferMeta_on_policy.population)
+            for i in range(20):
+                batch = replayBufferMeta_actor.get_batch(batch_size)
+                next_value = controller.get_value(batch['next_state'])
+                batch['next_value'] = next_value
+                controller.update_actor(batch, lr)
 
-                controller.sync_net()
-                if not config.meta.one_step_td:
-                    replayBufferMeta_actor.clear()
-                    replayBufferMeta_critic.clear()
-                else:
-                    replayBufferMeta_critic.clear()
+            # update critic
+            batch_size = min(config.meta.batch_size,
+                                replayBufferMeta_critic.population)
+            for i in range(10):
+                batch = replayBufferMeta_critic.get_batch(batch_size)
+                controller.update_critic(batch, lr)
+
+            controller.sync_net()
+            if not config.meta.one_step_td:
+                replayBufferMeta_actor.clear()
+                replayBufferMeta_critic.clear()
+            else:
+                replayBufferMeta_critic.clear()
 
             # ----Save contrller.----
             if ep_meta % config.meta.save_frequency == 0:

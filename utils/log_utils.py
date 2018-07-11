@@ -58,7 +58,17 @@ def read_log_total_reward_aver(log_file):
             old_line = line
         return curve
 
+def read_log_mean_auc(log_file):
+    with open(log_file, 'r') as f:
+        curve = []
+        for line in f.readlines():
+            if 'mean_auc' in line:
+                string = line.split(':')[-1].strip()
+                curve.append(float(string))
+        return curve
+
 if __name__ == '__main__':
-    print(read_log_total_reward_aver('log/log_6_20/three_agent_design1_01.log'))
+    print(read_log_mean_auc('/users/hzhang2/haowen/GitHub/AutoLossApps/log/log_7_10/meta_3task_ppo.log'))
+
 
 

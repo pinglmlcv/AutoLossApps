@@ -97,6 +97,35 @@ def mnist_transfer_cifar10():
     plt.show()
     plt.savefig('sync_period.pdf')
 
+def meta_3task():
+    curve_ppo1 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_ppo.log')
+    curve_ppo2 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_ppo_round2.log')
+    curve_ppo3 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_ppo_round3.log')
+
+    curve_tdppo1 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_tdppo.log')
+    curve_tdppo2 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_tdppo_round2.log')
+    curve_tdppo3 = log_utils.read_log_mean_auc('../log/log_7_10/meta_3task_tdppo_round3.log')
+
+    curve_ppo1 = np.array(curve_ppo1[0::5])
+    curve_ppo2 = np.array(curve_ppo2[0::5])
+    curve_ppo3 = np.array(curve_ppo3[0::5])
+
+    curve_tdppo1 = np.array(curve_tdppo1[0::5])
+    curve_tdppo2 = np.array(curve_tdppo2[0::5])
+    curve_tdppo3 = np.array(curve_tdppo3[0::5])
+
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(curve_ppo1)
+    plt.plot(curve_ppo2)
+    plt.plot(curve_ppo3)
+    plt.subplot(212)
+    plt.plot(curve_tdppo1)
+    plt.plot(curve_tdppo2)
+    plt.plot(curve_tdppo3)
+    plt.show()
+    plt.savefig('meta_3task.pdf')
+
 def mnist_compare_with_baseline():
     num = sys.argv[1]
 
@@ -270,5 +299,4 @@ def gridworld():
     fig.savefig('design.pdf', transparent = True, bbox_inches = 'tight', pad_inches = 0)
     #fig.savefig(save_dir + '.png', transparent = True, bbox_inches = 'tight', pad_inches = 0)
 if __name__ == '__main__':
-    #mnist_compare_with_baseline()
-    mnist_transfer_cifar10()
+    meta_3task()
