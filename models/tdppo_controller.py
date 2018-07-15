@@ -55,7 +55,8 @@ class BasePPO(Basic_model):
                                               for x in critic_param])
             #mse_loss = -tf.reduce_mean(adv * value)
             mse_loss = tf.reduce_mean(tf.square(self.target_value - value))
-            self.critic_loss = mse_loss + 0.001 * critic_reg_loss
+            reg_param = 0.0
+            self.critic_loss = mse_loss + reg_param * critic_reg_loss
 
         #if self.config.meta.one_step_td:
         #    adv = self.reward + gamma * self.next_value - value
@@ -75,7 +76,7 @@ class BasePPO(Basic_model):
                                             for x in pi_param])
             pg_loss = -tf.reduce_mean(tf.minimum(pg_losses1, pg_losses2))
             beta = self.config.meta.entropy_bonus_beta
-            reg_param = 0.001
+            reg_param = 0.0
             self.actor_loss = pg_loss + beta * entropy_loss +\
                 reg_param * actor_reg_loss
 

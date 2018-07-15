@@ -33,6 +33,11 @@ class Parser(object):
         agent.add('dim_s_h', self.config.getint('agent', 'dim_s_h_agent'))
         agent.add('dim_s_w', self.config.getint('agent', 'dim_s_w_agent'))
         agent.add('dim_s_c', self.config.getint('agent', 'dim_s_c_agent'))
+        agent.add('distill_mode', self.config.get('agent', 'distill_mode'))
+        agent.add('kl_temp', self.config.getfloat('agent', 'kl_temp'))
+        agent.add('c_kl', self.config.getfloat('agent', 'c_kl_agent'))
+        agent.add('c_ent', self.config.getfloat('agent', 'c_ent_agent'))
+        agent.add('c_distill', self.config.getfloat('agent', 'c_distill_agent'))
         agent.add('lr', self.config.getfloat('agent', 'lr_agent'))
         agent.add('total_episodes', self.config.getint('agent', 'total_episodes_agent'))
         agent.add('total_episodes_test', self.config.getint('agent', 'total_episodes_test_agent'))
@@ -48,14 +53,14 @@ class Parser(object):
         agent.add('save_frequency', self.config.getint('agent', 'save_frequency_agent'))
         agent.add('mute', self.config.getboolean('agent', 'mute_agent'))
         agent.add('lesson_length', self.config.getint('agent', 'lesson_length'))
+        agent.add('alpha_reg', self.config.getfloat('agent', 'alpha_reg_agent'))
+        agent.add('beta_reg', self.config.getfloat('agent', 'beta_reg_agent'))
 
         return agent
 
     def read_meta(self):
         meta = Section()
         meta.add('total_episodes', self.config.getint('meta', 'total_episodes_meta'))
-        meta.add('distill_mode', self.config.get('meta', 'distill_mode'))
-        meta.add('distill_temp', self.config.getfloat('meta', 'distill_temp'))
         meta.add('buffer_size', self.config.getint('meta', 'buffer_size_meta'))
         meta.add('ema_decay_state', self.config.getfloat('meta', 'ema_decay_state'))
         meta.add('ema_decay_auc_baseline', self.config.getfloat('meta', 'ema_decay_auc_baseline'))

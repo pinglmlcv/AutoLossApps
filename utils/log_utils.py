@@ -67,8 +67,17 @@ def read_log_mean_auc(log_file):
                 curve.append(float(string))
         return curve
 
+def read_log_mean_total_reward(log_file):
+    with open(log_file, 'r') as f:
+        curve = []
+        for line in f.readlines():
+            if 'mean_total_reward' in line:
+                string = line.split(':')[-1].strip()
+                curve.append(float(string))
+        return curve
+
 if __name__ == '__main__':
-    print(read_log_mean_auc('/users/hzhang2/haowen/GitHub/AutoLossApps/log/log_7_10/meta_3task_ppo.log'))
+    print(read_log_mean_total_reward('/users/hzhang2/haowen/GitHub/AutoLossApps/log/log_7_10/meta_3task_ppo.log'))
 
 
 
