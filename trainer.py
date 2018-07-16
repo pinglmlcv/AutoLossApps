@@ -84,7 +84,7 @@ class MlpPPO(tdppo_controller.BasePPO):
                 trainable=trainable,
                 scope='fc2')
 
-            output = tf.nn.softmax(logits)
+            output = tf.nn.softmax(logits * self.config.meta.logits_scale)
 
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
@@ -110,9 +110,10 @@ class MlpPPO(tdppo_controller.BasePPO):
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
 
-    def run_step(self, states, ep, epsilon=0.1):
+    def run_step(self, states, ep, epsilon=0):
         dim_a = self.config.meta.dim_a
-        #return ep % 5, 0
+        return 2, 2
+        #return ep % 5, ep % 5
         if random.random() < epsilon:
             action = random.randint(0, self.config.meta.dim_a - 1)
             return action, 'random'
@@ -157,8 +158,8 @@ class Trainer():
         self.agent_list = []
         optional_goals = [[(2, 1), (2, 5)],
                           [(6, 1), (6, 5)],
-                          [(2, 14), (2, 18)],
-                          [(6, 14), (6, 18)],
+                          [(2, 15), (2, 17)],
+                          [(6, 15), (6, 17)],
                          ]
         #optional_goals = [(2, 1),
         #                  (2, 5),
@@ -350,7 +351,7 @@ class Trainer():
                 # ----Update lesson probability.----
                 lesson_history.append(lesson)
                 lesson_prob = self.calc_lesson_prob(lesson_history)
-                if ep % 20 == 0:
+                if ep % config.agent.valid_frequency == 0:
                     logger.info('ep: {}, lesson_prob: {}'\
                                 .format(ep, lesson_prob))
                     for i in range(nAgent):
@@ -610,7 +611,7 @@ class Trainer():
                 if mask[i, j]:
                     r = self.test_agent(self.agent_list[i],
                                         self.env_list[j],
-                                        num_episodes=1,
+                                        num_episodes=50,
                                         mute=True)
                     performance_matrix[i, j, ep + 1] =\
                         performance_matrix[i, j, ep] * ema_decay\
