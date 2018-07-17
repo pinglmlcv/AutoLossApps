@@ -112,8 +112,7 @@ class MlpPPO(tdppo_controller.BasePPO):
 
     def run_step(self, states, ep, epsilon=0):
         dim_a = self.config.meta.dim_a
-        return 2, 2
-        #return ep % 5, ep % 5
+        return ep % 5, ep % 5
         if random.random() < epsilon:
             action = random.randint(0, self.config.meta.dim_a - 1)
             return action, 'random'
@@ -192,10 +191,10 @@ class Trainer():
                           (2, 5),
                           (6, 1),
                           (6, 5),
-                          (2, 14),
-                          (2, 18),
-                          (6, 14),
-                          (6, 18),
+                          (2, 15),
+                          (2, 17),
+                          (6, 15),
+                          (6, 17),
                          ]
         self.env_list.append(two_rooms.Env2Rooms(config,
                                                  optional_goals=optional_goals))
