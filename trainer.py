@@ -112,7 +112,7 @@ class MlpPPO(tdppo_controller.BasePPO):
 
     def run_step(self, states, ep, epsilon=0):
         dim_a = self.config.meta.dim_a
-        return ep % 5, ep % 5
+        #return ep % 5, ep % 5
         if random.random() < epsilon:
             action = random.randint(0, self.config.meta.dim_a - 1)
             return action, 'random'
@@ -701,8 +701,9 @@ if __name__ == '__main__':
         # ----Training----
         logger.info('TRAIN')
         controller_ckpt = '/datasets/BigLearning/haowen/AutoLossApps/saved_models/{}/controller/'.format(argv[1])
-        trainer.train_meta(save_model=True)
-        #trainer.train_meta(save_model=True, load_model=controller_ckpt)
+        controller_ckpt = '/media/haowen/AutoLossApps/saved_models/test/controller/'
+        #trainer.train_meta(save_model=True)
+        trainer.train_meta(save_model=True, load_model=controller_ckpt)
     elif argv[2] == 'test':
         ## ----Testing----
         logger.info('TEST')
