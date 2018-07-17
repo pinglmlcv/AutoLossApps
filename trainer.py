@@ -267,9 +267,6 @@ class Trainer():
             # different if we use a true episode as a lesson.
             meta_state = self.get_meta_state(performance_matrix[:, :, 0],
                                              lesson_prob)
-            print(performance_matrix[:, :, 0])
-            print(meta_state)
-            exit()
             for ep in range(config.agent.total_episodes):
                 meta_action, pi = controller.run_step([meta_state], ep, 0)
                 value = controller.get_value([meta_state])
