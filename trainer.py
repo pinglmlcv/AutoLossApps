@@ -267,6 +267,9 @@ class Trainer():
             # different if we use a true episode as a lesson.
             meta_state = self.get_meta_state(performance_matrix[:, :, 0],
                                              lesson_prob)
+            print(performance_matrix[:, :, 0])
+            print(meta_state)
+            exit()
             for ep in range(config.agent.total_episodes):
                 meta_action, pi = controller.run_step([meta_state], ep, 0)
                 value = controller.get_value([meta_state])
@@ -634,7 +637,10 @@ class Trainer():
         #lp = (lp - 0.5) * 2
         #return np.concatenate((pm.flatten(), lp))
         #return pm.flatten()
-        return np.diag(pm)
+        a = np.diag(pm)
+        mean = np.mean(a[:-1])
+        diff = a - mean
+        return np.append(a, diff)
 
     def get_meta_reward(self, curve):
         auc = area_under_curve(curve, self.config.meta.reward_strategy)
