@@ -15,11 +15,10 @@ import random
 from collections import deque
 
 from models import tdppo_controller
-from models import controller
-from models import two_rooms
-from models import gridworld_agent
+from models import reg
 import utils
 from utils import replaybuffer
+from utils import config_reg_util
 from utils.data_process import preprocess
 
 root_path = os.path.dirname(os.path.realpath(__file__))
@@ -142,7 +141,6 @@ class Trainer():
         gpu_options = tf.GPUOptions(allow_growth=True)
         configProto = tf.ConfigProto(gpu_options=gpu_options)
         self.sess = tf.InteractiveSession(config=configProto)
-        self.auc_baseline = None
 
         if config.meta.controller == 'designed':
             self.controller = controller.Controller(config, self.sess,
@@ -153,102 +151,32 @@ class Trainer():
         else:
             raise Exception('Invalid controller name')
 
-        self.env_list = []
-        self.agent_list = []
-        optional_goals = [[(2, 1), (2, 5)],
-                          [(6, 1), (6, 5)],
-                          [(2, 15), (2, 17)],
-                          [(6, 15), (6, 17)],
-                         ]
-        #optional_goals = [(2, 1),
-        #                  (2, 5),
-        #                  (6, 1),
-        #                  (6, 5),
-        #                  (2, 14),
-        #                  (2, 18),
-        #                  (6, 14),
-        #                  (6, 18),
-        #                  (4, 10)]
-        #optional_goals = [(3, 3),
-        #                  (5, 17)]
-        #optional_goals = [(4, 10)]
-        #for goal in optional_goals:
-        #    self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
-        for goal in optional_goals:
-            self.env_list.append(two_rooms.Env2Rooms(config, optional_goals=goal))
-        #self.env_list.append(two_rooms.Env2Rooms(config,
-        #                                         optional_goals=optional_goals))
-        #optional_goals = [(2, 2),
-        #                  (2, 3),
-        #                  (2, 4),
-        #                  (3, 2),
-        #                  (3, 3),
-        #                  (3, 4),
-        #                  (4, 2),
-        #                  (4, 3),
-        #                  (4, 4)]
-        optional_goals = [(2, 1),
-                          (2, 5),
-                          (6, 1),
-                          (6, 5),
-                          (2, 15),
-                          (2, 17),
-                          (6, 15),
-                          (6, 17),
-                         ]
-        self.env_list.append(two_rooms.Env2Rooms(config,
-                                                 optional_goals=optional_goals))
-
-        for i in range(len(self.env_list) - 1):
-            self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                   self.sess,
-                                   exp_name='{}/agent{}'.format(exp_name, i)))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                               self.sess,
-                               exp_name='{}/agent_hybrid'.format(exp_name),
-                               hybrid=True))
-
-        self.target_agent_id = len(self.agent_list) - 1
+        if config.task.student_model_name == 'reg':
+            self.agent = reg.Reg(config, self.sess,
+                                      exp_name=exp_name+'/reg')
 
     def train_meta(self, load_model=None, save_model=False):
         config = self.config
         controller = self.controller
-        keys = ['state', 'next_state', 'reward', 'action', 'target_value']
+        agent = self.agent
+        keys = ['state', 'next_state', 'reward', 'action']
         replayBufferMeta_on_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
         replayBufferMeta_off_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
-        meta_training_history = deque(maxlen=10)
-        # ----The epsilon decay schedule.----
-        epsilons = np.linspace(config.agent.epsilon_start,
-                               config.agent.epsilon_end,
-                               config.agent.epsilon_decay_steps)
-        nAgent = self.target_agent_id + 1
-
-        # ----Initialize performance matrix.----
+        meta_training_history = deque(maxlen=20)
+        # ----Initialize controller.----
         controller.initialize_weights()
         if load_model:
             controller.load_model(load_model)
-        for agent in self.agent_list:
-            agent.initialize_weights()
-        performance_matrix_init = np.zeros((nAgent, nAgent,
-                                            config.agent.total_episodes + 1))
-        for i in range(nAgent):
-            performance_matrix_init[i, i, 0] = \
-                self.test_agent(self.agent_list[i], self.env_list[i])
 
         for ep_meta in range(config.meta.total_episodes):
             logger.info('######## meta_episodes {} #########'.format(ep_meta))
             start_time = time.time()
-            replayBufferAgent_list = []
-            for i in range(len(self.agent_list)):
-                replayBufferAgent_list.append(
-                    replaybuffer.ReplayBuffer(config.agent.buffer_size))
 
             # ----Initialize agents.----
-            for agent in self.agent_list:
-                agent.initialize_weights()
-                agent.update_steps = 0
+            agent.initialize_weights()
+            agent.reset()
 
             # ----Initialize performance matrix and lesson probability.----
             performance_matrix = performance_matrix_init.copy()
@@ -326,7 +254,6 @@ class Trainer():
                                 replayBufferAgent_list[teacher],
                                 0,
                                 mute=config.agent.mute)
-                print(self.agent_list[0].update_steps)
 
                 # ----Update performance matrix.----
                 mask = np.zeros((nAgent, nAgent), dtype=int)
@@ -691,9 +618,9 @@ if __name__ == '__main__':
     argv = sys.argv
     # ----Parsing config file.----
     logger.info(socket.gethostname())
-    config_file = 'gridworld_tdppo.cfg'
+    config_file = 'regression.cfg'
     config_path = os.path.join(root_path, 'config/' + config_file)
-    config = utils.Parser(config_path)
+    config = config_reg_util.Parser(config_path)
     config.print_config()
 
     # ----Instantiate a trainer object.----
@@ -702,10 +629,7 @@ if __name__ == '__main__':
     if argv[2] == 'train':
         # ----Training----
         logger.info('TRAIN')
-        controller_ckpt = '/datasets/BigLearning/haowen/AutoLossApps/saved_models/{}/controller/'.format(argv[1])
-        controller_ckpt = '/media/haowen/AutoLossApps/saved_models/test/controller/'
         trainer.train_meta(save_model=True)
-        #trainer.train_meta(save_model=True, load_model=controller_ckpt)
     elif argv[2] == 'test':
         ## ----Testing----
         logger.info('TEST')
