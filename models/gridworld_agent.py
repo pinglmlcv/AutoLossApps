@@ -108,14 +108,14 @@ class AgentGridWorld(Basic_model):
                                                 predictions=self.q_wrt_a,
                                                 scope='dqn_loss')
         # kl loss, make each task agent behavior similiar with the hybrid agent
-        #kl_loss = tf.reduce_mean(tf.reduce_sum(p_student * tf.log(p_student / p_teacher)))\
-        #    * config.c_kl
+        kl_loss = tf.reduce_mean(tf.reduce_sum(p_student * tf.log(p_student / p_teacher)))\
+            * config.c_kl
         # entropy loss, encourage exploration
-        #ent_loss = tf.reduce_mean(tf.reduce_sum(p_student * tf.log(p_student)))\
-        #    * config.c_ent
+        ent_loss = tf.reduce_mean(tf.reduce_sum(p_student * tf.log(p_student)))\
+            * config.c_ent
 
-        #q_learning_loss = dqn_loss + kl_loss + ent_loss
-        q_learning_loss = dqn_loss
+        q_learning_loss = dqn_loss + kl_loss + ent_loss
+        #q_learning_loss = dqn_loss
 
         self.q_learning_op = tf.train.AdamOptimizer(self.lr)\
             .minimize(q_learning_loss)

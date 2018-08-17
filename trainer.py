@@ -112,7 +112,7 @@ class MlpPPO(tdppo_controller.BasePPO):
 
     def run_step(self, states, ep, epsilon=0):
         dim_a = self.config.meta.dim_a
-        #return ep % 5, ep % 5
+        return ep % 4, ep % 4
         if random.random() < epsilon:
             action = random.randint(0, self.config.meta.dim_a - 1)
             return action, 'random'
@@ -265,7 +265,7 @@ class Trainer():
 
             # NOTE: We call M timesteps as an episode. Because the length of an
             # episode is unfixed so the training steps of each lesson is
-            # different if we use a true episode as a lesson.
+            # different if we use a true episode as a training unit.
             meta_state = self.get_meta_state(performance_matrix[:, :, 0],
                                              lesson_prob)
             for ep in range(config.agent.total_episodes):
@@ -326,7 +326,6 @@ class Trainer():
                                 replayBufferAgent_list[teacher],
                                 0,
                                 mute=config.agent.mute)
-                print(self.agent_list[0].update_steps)
 
                 # ----Update performance matrix.----
                 mask = np.zeros((nAgent, nAgent), dtype=int)
@@ -373,10 +372,12 @@ class Trainer():
 
                 # ----End of an agent episode.----
 
+            total_reward_avers = []
             for i in range(nAgent):
                 total_reward_aver = self.test_agent(self.agent_list[i],
-                                self.env_list[i],
-                                mute=False)
+                                                    self.env_list[i],
+                                                    mute=False)
+                total_reward_avers.append(total_reward_aver)
 
             #curve = performance_matrix[nAgent - 1, nAgent - 1, :] + \
             #    performance_matrix[0, 0, :]
@@ -384,7 +385,7 @@ class Trainer():
             #meta_training_history.append(auc)
             #mean = np.mean(meta_training_history)
             #logger.info('mean_performance: {}'.format(mean))
-            meta_training_history.append(total_reward_aver)
+            meta_training_history.append(np.mean(total_reward_avers[:-1]))
             mean = np.mean(meta_training_history)
             logger.info('mean_total_reward: {}'.format(mean))
 
@@ -658,9 +659,8 @@ class Trainer():
         old = matrix[:, :, ep]
         new = matrix[:, :, ep + 1]
         reward = 0
-        for i in range(len(self.agent_list)):
+        for i in range(len(self.agent_list) - 1):
             reward += (new[i, i] - old[i, i])
-        #reward = (new[-1,-1] - old[-1,-1])
         return reward
 
     def baseline_multi(self):
