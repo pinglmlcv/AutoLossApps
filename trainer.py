@@ -17,6 +17,7 @@ from collections import deque
 from models.controllers import MlpPPO
 from models import controller
 from models import two_rooms
+from models import three_rooms
 from models import gridworld_agent
 import utils
 from utils import replaybuffer
@@ -79,11 +80,11 @@ class Trainer():
         #                  (2, 16),
         #                  (6, 16),
         #                 ]
-        optional_goals = [(7, 19)]
+        optional_goals = [(7, 18)]
         for goal in optional_goals:
-            self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal,
+            self.env_list.append(three_rooms.Env2Rooms(config, default_goal=goal,
                                                      default_init=(1, 1)))
-        self.env_list.append(two_rooms.Env2Rooms(config,
+        self.env_list.append(three_rooms.Env2Rooms(config,
                                                  optional_goals=optional_goals))
 
         for i in range(len(self.env_list) - 1):

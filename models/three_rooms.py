@@ -36,15 +36,15 @@ from pycolab.prefab_parts import sprites as prefab_sprites
 from pycolab import things as plab_things
 
 
-GAME_ART = ['#####################',
-            '#     ##     ##     #',
-            '#     ##     ##     #',
-            '#     ##     ##     #',
-            '#                   #',
-            '#     ##     ##     #',
-            '#     ##     ##     #',
-            '#     ##     ##     #',
-            '#####################']
+GAME_ART = ['####################',
+            '#     ##    ##     #',
+            '#     ##    ##     #',
+            '#     ##    ##     #',
+            '#                  #',
+            '#     ##    ##     #',
+            '#     ##    ##     #',
+            '#     ##    ##     #',
+            '####################']
 
 def modify_art(art, position, char):
     new_art = art.copy()
