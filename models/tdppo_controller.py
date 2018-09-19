@@ -12,24 +12,18 @@ class BasePPO(Basic_model):
         self.update_steps = 0
 
     def _build_placeholder(self):
-        config = self.config.agent
+        '''
+        Must include:
+            self.state,
+            self.action,
+            self.reward,
+            self.next_value,
+            self.target_value,
+            self.lr
 
-        dim_s_h = config.dim_s_h
-        dim_s_w = config.dim_s_w
-        dim_s_c = config.dim_s_c
 
-        with tf.variable_scope('placeholder'):
-            self.state = tf.placeholder(tf.float32,
-                                        shape=[None, dim_s_h, dim_s_w, dim_s_c],
-                                        name='state')
-            self.action = tf.placeholder(tf.int32, shape=[None],
-                                         name='action')
-            self.reward = tf.placeholder(tf.float32, shape=[None],
-                                         name='reward')
-            self.target_value = tf.placeholder(tf.float32,
-                                               shape=[None],
-                                               name='target_value')
-            self.lr = tf.placeholder(tf.float32, name='learning_rate')
+        '''
+        raise NotImplementedError
 
     def _build_graph(self):
         pi, pi_param = self.build_actor_net('actor_net', trainable=True)
@@ -151,7 +145,6 @@ class BasePPO(Basic_model):
                      self.lr: lr}
         self.sess.run(fetch, feed_dict)
 
-
 class MlpPPO(BasePPO):
     def __init__(self, config, sess, exp_name='MlpPPO'):
         super(MlpPPO, self).__init__(config, sess, exp_name)
@@ -159,14 +152,33 @@ class MlpPPO(BasePPO):
             self._build_placeholder()
             self._build_graph()
 
+    def _build_placeholder(self):
+        config = self.config.agent
+        dim_s = config.dim_s
+        with tf.variable_scope('placeholder'):
+            self.state = tf.placeholder(tf.float32,
+                                        shape=[None, dim_s],
+                                        name='state')
+            self.action = tf.placeholder(tf.int32, shape=[None],
+                                         name='action')
+            self.reward = tf.placeholder(tf.float32, shape=[None],
+                                         name='reward')
+            self.next_value = tf.placeholder(tf.float32,
+                                             shape=[None],
+                                             name='next_value')
+            self.target_value = tf.placeholder(tf.float32,
+                                               shape=[None],
+                                               name='target_value')
+            self.lr = tf.placeholder(tf.float32, name='learning_rate')
+
     def build_actor_net(self, scope, trainable):
         with tf.variable_scope(scope):
-            dim_h = self.config.meta.dim_h
-            dim_a = self.config.meta.dim_a
+            dim_h = 20
+            dim_a = self.config.agent.dim_a
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
-                activation_fn=tf.nn.leaky_relu,
+                activation_fn=tf.nn.tanh,
                 trainable=trainable,
                 scope='fc1')
 
@@ -177,18 +189,19 @@ class MlpPPO(BasePPO):
                 trainable=trainable,
                 scope='fc2')
 
-            output = tf.nn.softmax(logits * self.config.meta.logits_scale)
+            output = tf.nn.softmax(logits)
+
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
             return output, param
 
     def build_critic_net(self, scope):
         with tf.variable_scope(scope):
-            dim_h = self.config.meta.dim_h
+            dim_h = 20
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
-                activation_fn=tf.nn.leaky_relu,
+                activation_fn=tf.nn.tanh,
                 scope='fc1')
 
             value = tf.contrib.layers.fully_connected(
@@ -196,35 +209,25 @@ class MlpPPO(BasePPO):
                 num_outputs=1,
                 activation_fn=None,
                 scope='fc2')
-
             value = tf.squeeze(value)
 
             param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                       '{}/{}'.format(self.exp_name, scope))
-
             return value, param
 
+    def run_step(self, states, epsilon=0):
+        dim_a = self.config.agent.dim_a
+        if random.random() < epsilon:
+            return random.randint(0, self.config.agent.dim_a - 1), 0
+        else:
+            pi = self.sess.run(self.pi, {self.state: states})[0]
+            action = np.random.choice(dim_a, 1, p=pi)[0]
+            return action, pi
 
-class LSTMPPO(BasePPO):
-    # ----
-    # Discrete control actor-actor model with LSTM
-    # ----
-    def __init__(self, config, sess, exp_name='LSTMPPO'):
-        super(LSTMPPO, self).__init__(config, sess, exp_name)
-        with tf.variable_scope(exp_name):
-            self._build_placeholder()
-            self._build_graph()
-
-    def build_actor_net(self, scope, trainable):
-        with tf.variable_scope(scope):
-            dim_h = self.config.meta_dim_h_lstm
-            nlayers = self.config.meta_nlayers_lstm
-
-        pass
-
-    def build_critic_net(self, scope):
-        pass
-
+    def get_value(self, state):
+        feed_dict = {self.state: state}
+        value = self.sess.run(self.value, feed_dict)
+        return value
 
 class CNNPPO(BasePPO):
     def __init__(self, config, sess, exp_name='CNNPPO'):

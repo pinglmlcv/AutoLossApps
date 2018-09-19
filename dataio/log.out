@@ -1,0 +1,13 @@
+Number of word-internal characters: 0
+Number of word-final characters: 0
+Reducing number of merge operations by 0
+Traceback (most recent call last):
+  File "languageDataGenerator.py", line 129, in <module>
+    generateMTData()
+  File "languageDataGenerator.py", line 95, in generateMTData
+    subword_gen(process1_de_name, subword_de_name, 5000)
+  File "languageDataGenerator.py", line 116, in subword_gen
+    learn_bpe(infile_stream, outfile_stream, num_symbols, is_dict=False, total_symbols=True)
+  File "/home/haowen/GitHub/AutoLossApps/lib/subword_nmt/subword_nmt/learn_bpe.py", line 229, in learn_bpe
+    threshold = max(stats.values()) / 10
+ValueError: max() arg is an empty sequence

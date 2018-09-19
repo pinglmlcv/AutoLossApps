@@ -14,7 +14,7 @@ import time
 import random
 from collections import deque
 
-from models import tdppo_controller
+from models.controllers import MlpPPO
 from models import controller
 from models import two_rooms
 from models import gridworld_agent
@@ -43,90 +43,6 @@ def reward_decay(transitions, gamma):
         transitions[i]['target_value'] += transitions[i+1]['target_value'] * gamma
 
 
-class MlpPPO(tdppo_controller.BasePPO):
-    def __init__(self, config, sess, exp_name='MlpPPO'):
-        super(MlpPPO, self).__init__(config, sess, exp_name)
-        with tf.variable_scope(exp_name):
-            self._build_placeholder()
-            self._build_graph()
-
-    def _build_placeholder(self):
-        config = self.config.meta
-        dim_s = config.dim_s
-        with tf.variable_scope('placeholder'):
-            self.state = tf.placeholder(tf.float32,
-                                        shape=[None, dim_s],
-                                        name='state')
-            self.action = tf.placeholder(tf.int32, shape=[None],
-                                         name='action')
-            self.reward = tf.placeholder(tf.float32, shape=[None],
-                                         name='reward')
-            self.target_value = tf.placeholder(tf.float32,
-                                               shape=[None],
-                                               name='target_value')
-            self.lr = tf.placeholder(tf.float32, name='learning_rate')
-
-    def build_actor_net(self, scope, trainable):
-        with tf.variable_scope(scope):
-            dim_h = self.config.meta.dim_h
-            dim_a = self.config.meta.dim_a
-            hidden = tf.contrib.layers.fully_connected(
-                inputs=self.state,
-                num_outputs=dim_h,
-                activation_fn=tf.nn.tanh,
-                trainable=trainable,
-                scope='fc1')
-
-            logits = tf.contrib.layers.fully_connected(
-                inputs=hidden,
-                num_outputs=dim_a,
-                activation_fn=None,
-                trainable=trainable,
-                scope='fc2')
-
-            output = tf.nn.softmax(logits * self.config.meta.logits_scale)
-
-            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
-                                      '{}/{}'.format(self.exp_name, scope))
-            return output, param
-
-    def build_critic_net(self, scope):
-        with tf.variable_scope(scope):
-            dim_h = 20
-            hidden = tf.contrib.layers.fully_connected(
-                inputs=self.state,
-                num_outputs=dim_h,
-                activation_fn=tf.nn.tanh,
-                scope='fc1')
-
-            value = tf.contrib.layers.fully_connected(
-                inputs=hidden,
-                num_outputs=1,
-                activation_fn=None,
-                scope='fc2')
-            value = tf.squeeze(value)
-
-            param = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
-                                      '{}/{}'.format(self.exp_name, scope))
-            return value, param
-
-    def run_step(self, states, ep, epsilon=0):
-        dim_a = self.config.meta.dim_a
-        return ep % 4, ep % 4
-        if random.random() < epsilon:
-            action = random.randint(0, self.config.meta.dim_a - 1)
-            return action, 'random'
-        else:
-            pi = self.sess.run(self.pi, {self.state: states})[0]
-            action = np.random.choice(dim_a, 1, p=pi)[0]
-            return action, pi
-
-    def get_value(self, state):
-        feed_dict = {self.state: state}
-        value = self.sess.run(self.value, feed_dict)
-        return value
-
-
 class Trainer():
     """ A class to wrap training code. """
     def __init__(self, config, exp_name=None):
@@ -145,8 +61,11 @@ class Trainer():
         self.auc_baseline = None
 
         if config.meta.controller == 'designed':
-            self.controller = controller.Controller(config, self.sess,
-                exp_name=exp_name+'/controller')
+            self.controller = controller.Controller(
+                config,
+                self.sess,
+                exp_name=exp_name+'/controller'
+            )
         elif config.meta.controller == 'MlpPPO':
             self.controller = MlpPPO(config, self.sess,
                 exp_name=exp_name+'/controller')
@@ -155,58 +74,35 @@ class Trainer():
 
         self.env_list = []
         self.agent_list = []
-        optional_goals = [[(2, 1), (2, 5)],
-                          [(6, 1), (6, 5)],
-                          [(2, 15), (2, 17)],
-                          [(6, 15), (6, 17)],
-                         ]
-        #optional_goals = [(2, 1),
-        #                  (2, 5),
-        #                  (6, 1),
-        #                  (6, 5),
-        #                  (2, 14),
-        #                  (2, 18),
-        #                  (6, 14),
-        #                  (6, 18),
-        #                  (4, 10)]
-        #optional_goals = [(3, 3),
-        #                  (5, 17)]
-        #optional_goals = [(4, 10)]
-        #for goal in optional_goals:
-        #    self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal))
+        #optional_goals = [(2, 3),
+        #                  (6, 3),
+        #                  (2, 16),
+        #                  (6, 16),
+        #                 ]
+        optional_goals = [(7, 19)]
         for goal in optional_goals:
-            self.env_list.append(two_rooms.Env2Rooms(config, optional_goals=goal))
-        #self.env_list.append(two_rooms.Env2Rooms(config,
-        #                                         optional_goals=optional_goals))
-        #optional_goals = [(2, 2),
-        #                  (2, 3),
-        #                  (2, 4),
-        #                  (3, 2),
-        #                  (3, 3),
-        #                  (3, 4),
-        #                  (4, 2),
-        #                  (4, 3),
-        #                  (4, 4)]
-        optional_goals = [(2, 1),
-                          (2, 5),
-                          (6, 1),
-                          (6, 5),
-                          (2, 15),
-                          (2, 17),
-                          (6, 15),
-                          (6, 17),
-                         ]
+            self.env_list.append(two_rooms.Env2Rooms(config, default_goal=goal,
+                                                     default_init=(1, 1)))
         self.env_list.append(two_rooms.Env2Rooms(config,
                                                  optional_goals=optional_goals))
 
         for i in range(len(self.env_list) - 1):
-            self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                                   self.sess,
-                                   exp_name='{}/agent{}'.format(exp_name, i)))
-        self.agent_list.append(gridworld_agent.AgentGridWorld(config,
-                               self.sess,
-                               exp_name='{}/agent_hybrid'.format(exp_name),
-                               hybrid=True))
+            self.agent_list.append(
+                gridworld_agent.AgentGridWorld(
+                    config,
+                    self.sess,
+                    exp_name='{}/agent{}'.format(exp_name, i),
+                    hybrid=False
+                )
+            )
+        self.agent_list.append(
+            gridworld_agent.AgentGridWorld(
+                config,
+                self.sess,
+                exp_name='{}/agent_hybrid'.format(exp_name),
+                hybrid=True
+            )
+        )
 
         self.target_agent_id = len(self.agent_list) - 1
 
@@ -225,12 +121,14 @@ class Trainer():
                                config.agent.epsilon_decay_steps)
         nAgent = self.target_agent_id + 1
 
-        # ----Initialize performance matrix.----
+        # ----Initialize controller.----
         controller.initialize_weights()
         if load_model:
             controller.load_model(load_model)
         for agent in self.agent_list:
             agent.initialize_weights()
+
+        # ----Initialize performance matrix.----
         performance_matrix_init = np.zeros((nAgent, nAgent,
                                             config.agent.total_episodes + 1))
         for i in range(nAgent):
@@ -258,10 +156,6 @@ class Trainer():
             target_agent_performance = []
 
             # ----Start a meta episode.----
-            # curriculum content:
-            #   0: train agent0
-            #   1: train agent1
-            #   2: distill from agent0 to agent1
 
             # NOTE: We call M timesteps as an episode. Because the length of an
             # episode is unfixed so the training steps of each lesson is
@@ -278,30 +172,6 @@ class Trainer():
                     logger.info('=================')
                     logger.info('episodes: {}, lesson: {}'.format(ep, lesson))
 
-                #if lesson < nAgent:
-                #    student = lesson
-                #    epsilon = epsilons[min(self.agent_list[student].update_steps,
-                #                           config.agent.epsilon_decay_steps-1)]
-                #    self.train_agent_one_lesson(self.agent_list[student],
-                #                                self.env_list[student],
-                #                                replayBufferAgent_list[student],
-                #                                epsilon,
-                #                                mute=config.agent.mute)
-                #else:
-                #    # TODO: For brevity, we use the expert net to sample actions.
-                #    # Previous study showed that sampling actions from student
-                #    # net gives a better result, we might try it later.
-                #    teacher = lesson - nAgent
-                #    student = nAgent - 1
-                #    epsilon = epsilons[min(self.agent_list[teacher].update_steps,
-                #                           config.agent.epsilon_decay_steps-1)]
-                #    self.distill_agent_one_lesson(self.agent_list[teacher],
-                #                                  self.agent_list[student],
-                #                                  self.env_list[teacher],
-                #                                  replayBufferAgent_list[teacher],
-                #                                  epsilon,
-                #                                  mute=config.agent.mute)
-
                 if lesson < nAgent - 1:
                     student = lesson
                     epsilon = epsilons[min(self.agent_list[student].update_steps,
@@ -311,7 +181,7 @@ class Trainer():
                                                 replayBufferAgent_list[student],
                                                 epsilon,
                                                 mute=config.agent.mute)
-                else:
+                elif lesson == nAgent - 1:
                     # TODO: For brevity, we use the expert net to sample actions.
                     # Previous study showed that sampling actions from student
                     # net gives a better result, we might try it later.
@@ -326,6 +196,17 @@ class Trainer():
                                 replayBufferAgent_list[teacher],
                                 0,
                                 mute=config.agent.mute)
+                else:
+                    student = nAgent - 1
+                    # TODO temp
+                    self.agent_list[student].hybrid = False
+                    epsilon = epsilons[min(self.agent_list[student].update_steps,
+                                           config.agent.epsilon_decay_steps-1)]
+                    self.train_agent_one_lesson(self.agent_list[student],
+                                                self.env_list[student],
+                                                replayBufferAgent_list[student],
+                                                epsilon,
+                                                mute=config.agent.mute)
 
                 # ----Update performance matrix.----
                 mask = np.zeros((nAgent, nAgent), dtype=int)
@@ -351,6 +232,7 @@ class Trainer():
                 # ----Update lesson probability.----
                 lesson_history.append(lesson)
                 lesson_prob = self.calc_lesson_prob(lesson_history)
+
                 if ep % config.agent.valid_frequency == 0:
                     logger.info('ep: {}, lesson_prob: {}'\
                                 .format(ep, lesson_prob))

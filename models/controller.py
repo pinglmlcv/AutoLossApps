@@ -108,7 +108,8 @@ class Controller(Basic_model):
             self.saver = tf.train.Saver()
 
     def run_step(self, state, ep, epsilon=0):
-        return ep % 4, ep % 4
+        return 0, 0
+        return ep % 5, ep % 5
         #
         # Sample an action from a given state, probabilistically
 

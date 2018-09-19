@@ -10,7 +10,6 @@ import time
 import os
 
 import utils
-from models import layers
 
 logger = utils.get_logger()
 
@@ -60,8 +59,8 @@ class Basic_model():
         if not os.path.exists(task_dir):
             os.makedirs(task_dir, exist_ok=True)
         save_path = os.path.join(task_dir, 'model')
-        logger.info('Save model at {}'.format(save_path))
         self.saver.save(self.sess, save_path, global_step=step)
+        logger.info('Model Saved at {}'.format(save_path))
 
     def print_weights(self, tvars=None):
         if not tvars:

@@ -132,6 +132,26 @@ class Parser(object):
         return os.path.join(self.data_dir, test_data_file)
 
 
+def load_config(cfg_dir):
+    '''
+        Raises:
+            FileNotFoundError if 'cfg.py' doesn't exist in cfg_dir
+    '''
+    if not os.path.isfile( os.path.join( cfg_dir, 'cfg.py' ) ):
+        raise ImportError( 'cfg.py not found in {0}'.format( cfg_dir ) )
+    import sys
+    sys.path.insert( 0, cfg_dir )
+    from cfg import get_cfg
+    cfg = get_cfg()
+    # cleanup
+    try:
+        del sys.modules[ 'cfg' ]
+    except:
+        pass
+    sys.path.remove(cfg_dir)
+
+    return cfg
+
 if __name__ == '__main__':
     root_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     config_path = os.path.join(root_path, 'config/gridworld.cfg')
