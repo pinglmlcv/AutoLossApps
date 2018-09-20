@@ -91,8 +91,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-1.0)
-            the_plot.terminate_episode()
+            the_plot.add_reward(-0.1)
             return
 
         # See if we've found the mystery spot.
@@ -116,7 +115,10 @@ class Env2Rooms():
     def __init__(self, config, default_goal=None, optional_goals=None,
                  default_init=None, optional_inits=None):
         self.config = config
-        self.max_time_steps = config.agent.total_steps
+        try:
+            self.max_time_steps = config.agent.total_steps
+        except:
+            self.max_time_steps = 10
         self.game_art = copy.deepcopy(GAME_ART)
         self.default_goal = default_goal
         self.default_init = default_init

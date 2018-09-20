@@ -42,6 +42,7 @@ class Parser(object):
         agent.add('total_episodes', self.config.getint('agent', 'total_episodes_agent'))
         agent.add('total_episodes_test', self.config.getint('agent', 'total_episodes_test_agent'))
         agent.add('total_steps', self.config.getint('agent', 'total_steps_agent'))
+        agent.add('total_steps_test', self.config.getint('agent', 'total_steps_test_agent'))
         agent.add('gamma', self.config.getfloat('agent', 'gamma_agent'))
         agent.add('epsilon_start', self.config.getfloat('agent', 'epsilon_start'))
         agent.add('epsilon_end', self.config.getfloat('agent', 'epsilon_end'))
@@ -55,6 +56,7 @@ class Parser(object):
         agent.add('lesson_length', self.config.getint('agent', 'lesson_length'))
         agent.add('alpha_reg', self.config.getfloat('agent', 'alpha_reg_agent'))
         agent.add('beta_reg', self.config.getfloat('agent', 'beta_reg_agent'))
+        agent.add('greedy', self.config.getboolean('agent', 'greedy_agent'))
 
         return agent
 
@@ -104,6 +106,8 @@ class Parser(object):
     def model_dir(self):
         if socket.gethostname() == 'Luna-Desktop':
             return os.path.expanduser(self.config.get('env', 'model_dir2'))
+        elif socket.gethostname() == 'jungpu4':
+            return os.path.expanduser(self.config.get('env', 'model_dir3'))
         else:
             return os.path.expanduser(self.config.get('env', 'model_dir1'))
 

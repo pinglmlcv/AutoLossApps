@@ -39,9 +39,9 @@ from pycolab import things as plab_things
 GAME_ART = ['####################',
             '#     ##    ##     #',
             '#     ##    ##     #',
-            '#     ##    ##     #',
-            '#                  #',
-            '#     ##    ##     #',
+            '#     ## #  ##     #',
+            '#        #         #',
+            '#     ## #  ##     #',
             '#     ##    ##     #',
             '#     ##    ##     #',
             '####################']
@@ -91,8 +91,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-1.0)
-            the_plot.terminate_episode()
+            the_plot.add_reward(-0.02)
             return
 
         # See if we've found the mystery spot.
@@ -101,7 +100,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.02)
+            the_plot.add_reward(-0.01)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -112,7 +111,7 @@ class GoalDrape(plab_things.Drape):
         pass
 
 
-class Env2Rooms():
+class Env3Rooms():
     def __init__(self, config, default_goal=None, optional_goals=None,
                  default_init=None, optional_inits=None):
         self.config = config
@@ -193,7 +192,7 @@ def main(argv=()):
     del argv  # Unused.
 
     # Build a 2-rooms game environment
-    env = Env2Rooms(1)
+    env = Env3Rooms(1)
     env.set_goal_position((3,3))
     env.set_init_position((2,2))
 

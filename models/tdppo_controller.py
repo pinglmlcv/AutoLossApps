@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import os
+import random
 
 from models.basic_model import Basic_model
 import utils
@@ -153,7 +154,7 @@ class MlpPPO(BasePPO):
             self._build_graph()
 
     def _build_placeholder(self):
-        config = self.config.agent
+        config = self.config.meta
         dim_s = config.dim_s
         with tf.variable_scope('placeholder'):
             self.state = tf.placeholder(tf.float32,
@@ -173,8 +174,8 @@ class MlpPPO(BasePPO):
 
     def build_actor_net(self, scope, trainable):
         with tf.variable_scope(scope):
-            dim_h = 20
-            dim_a = self.config.agent.dim_a
+            dim_h = self.config.meta.dim_h
+            dim_a = self.config.meta.dim_a
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
@@ -197,7 +198,7 @@ class MlpPPO(BasePPO):
 
     def build_critic_net(self, scope):
         with tf.variable_scope(scope):
-            dim_h = 20
+            dim_h = self.config.meta.dim_h
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
@@ -215,10 +216,11 @@ class MlpPPO(BasePPO):
                                       '{}/{}'.format(self.exp_name, scope))
             return value, param
 
-    def run_step(self, states, epsilon=0):
-        dim_a = self.config.agent.dim_a
+    def run_step(self, states, ep, epsilon=0):
+        dim_a = self.config.meta.dim_a
         if random.random() < epsilon:
-            return random.randint(0, self.config.agent.dim_a - 1), 0
+            action = random.randint(0, dim_a - 1)
+            return action, 'random'
         else:
             pi = self.sess.run(self.pi, {self.state: states})[0]
             action = np.random.choice(dim_a, 1, p=pi)[0]

@@ -8,6 +8,7 @@ import numpy as np
 import os
 import time
 import math
+import random
 
 import utils
 from models.basic_model import Basic_model
@@ -108,8 +109,8 @@ class Controller(Basic_model):
             self.saver = tf.train.Saver()
 
     def run_step(self, state, ep, epsilon=0):
-        return 0, 0
-        return ep % 5, ep % 5
+        #return 3, 3
+        #return ep % 4, ep % 4
         #
         # Sample an action from a given state, probabilistically
 
@@ -124,10 +125,10 @@ class Controller(Basic_model):
         #lesson_id     = [0,  1,  3,  4,  2,  3,  4,  2 ]
         #lesson_period = [100, 40, 30]
         #lesson_id     = [0, 2, 1]
-        lesson_period = [30]
-        lesson_id     = [4]
-        #lesson_period = [15, 15] + [1] * 3 * 10 + [40]
-        #lesson_id = [i for i in range(2)] + [i for i in range(2, 5)] * 10 + [2]
+        #lesson_period = [30]
+        #lesson_id     = [4]
+        lesson_period = [1] * 30 + [20]
+        lesson_id = [0, 1, 2] * 10 + [3]
         #lesson_period = [1]*5*100
         #lesson_id = [i for i in range(5)] * 100
 
@@ -138,7 +139,7 @@ class Controller(Basic_model):
         while ep > lesson_period[grade]:
             ep -= lesson_period[grade]
             grade = min(grade + 1, len(lesson_period)-1)
-        return lesson_id[grade], [0, 0]
+        return lesson_id[grade], lesson_id[grade]
 
     def update(self, batch):
         pass
