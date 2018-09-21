@@ -74,7 +74,6 @@ class Trainer():
             raise Exception('Invalid controller name')
 
         self.env_list = []
-        self.agent_list = []
         # First task: find the door of the first room
         goal_1 = [(4, 6)]
         init_1 = []
@@ -109,82 +108,69 @@ class Trainer():
                                                    optional_goals=goal_4,
                                                    optional_inits=init_4))
 
-        for i in range(len(self.env_list) - 1):
-            self.agent_list.append(
-                gridworld_agent.AgentGridWorld(
-                    config,
-                    self.sess,
-                    exp_name='{}/agent{}'.format(exp_name, i),
-                    hybrid=False
-                )
-            )
-        self.agent_list.append(
+        self.agent = \
             gridworld_agent.AgentGridWorld(
                 config,
                 self.sess,
-                exp_name='{}/agent_hybrid'.format(exp_name),
-                hybrid=True
+                exp_name='{}/agent'.format(exp_name),
             )
-        )
 
-        self.target_agent_id = len(self.agent_list) - 1
 
     def train_meta(self, load_model=None, save_model=False):
         config = self.config
         controller = self.controller
+        agent = self.agent
+        env_list = self.env_list
+
         keys = ['state', 'next_state', 'reward', 'action', 'target_value']
         replayBufferMeta_on_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
         replayBufferMeta_off_policy = replaybuffer.ReplayBuffer(
             config.meta.buffer_size, keys=keys)
         meta_training_history = deque(maxlen=10)
+        nEnv = len(env_list)
         # ----The epsilon decay schedule.----
         epsilons = np.linspace(config.agent.epsilon_start,
                                config.agent.epsilon_end,
                                config.agent.epsilon_decay_steps)
-        nAgent = self.target_agent_id + 1
 
-        # ----Initialize controller.----
+        # ----Initialize controller and agent.----
         controller.initialize_weights()
         if load_model:
             controller.load_model(load_model)
-        for agent in self.agent_list:
-            agent.initialize_weights()
+        # ----Initialize agent.----
+        agent.initialize_weights()
 
         # ----Initialize performance matrix.----
-        performance_matrix_init = np.zeros((nAgent, nAgent,
-                                            config.agent.total_episodes + 1))
-        for i in range(nAgent):
-            performance_matrix_init[i, i, 0] = \
-                self.test_agent(self.agent_list[i], self.env_list[i])
+        performance_matrix_init = np.zeros((nEnv, config.agent.total_episodes + 1))
+        for i in range(nEnv):
+            performance_matrix_init[i, 0] = \
+                self.test_agent(agent, env_list[i])
 
         for ep_meta in range(config.meta.total_episodes):
             logger.info('######## meta_episodes {} #########'.format(ep_meta))
             start_time = time.time()
             replayBufferAgent_list = []
-            for i in range(len(self.agent_list)):
+            for i in range(nEnv):
                 replayBufferAgent_list.append(
                     replaybuffer.ReplayBuffer(config.agent.buffer_size))
 
-            # ----Initialize agents.----
-            for agent in self.agent_list:
-                agent.initialize_weights()
-                agent.update_steps = 0
+            # ----Initialize agent.----
+            agent.initialize_weights()
+            agent.update_steps = 0
 
             # ----Initialize performance matrix and lesson probability.----
             performance_matrix  = performance_matrix_init.copy()
             lesson_history = []
             lesson_prob = self.calc_lesson_prob(lesson_history)
             meta_transitions = []
-            target_agent_performance = []
 
             # ----Start an episode.----
 
             # NOTE: We call M timesteps as an episode. Because the length of an
             # episode is unfixed so the training steps of each lesson is
             # different if we use a true episode as a training unit.
-            meta_state = self.get_meta_state(performance_matrix[:, :, 0],
-                                             lesson_prob)
+            meta_state = self.get_meta_state(performance_matrix[:, 0])
             for ep in range(config.agent.total_episodes):
                 # TODO: choose with probability
                 if config.meta.off_policy:
@@ -194,55 +180,42 @@ class Trainer():
                 value = controller.get_value([meta_state])
                 #logger.info(value)
                 logger.info('pi: {}'.format(pi))
+                logger.info('action: {}'.format(meta_action))
                 lesson = meta_action
                 if not config.agent.mute:
                     logger.info('=================')
                     logger.info('episodes: {}, lesson: {}'.format(ep, lesson))
 
-                if lesson < nAgent - 1:
-                    # ----Distill and train.----
-                    # Training subtask agent
+                if lesson < nEnv - 1:
+                    # ----Training on a subtask and fine-tuning on the target
+                    # task.----
+                    # Training on subtask
                     student = lesson
-                    epsilon = epsilons[min(self.agent_list[student].update_steps,
+                    epsilon = epsilons[min(agent.update_steps,
                                            config.agent.epsilon_decay_steps-1)]
-                    self.train_agent_one_lesson(self.agent_list[student],
-                                                self.env_list[student],
+                    self.train_agent_one_lesson(agent,
+                                                env_list[student],
                                                 replayBufferAgent_list[student],
                                                 epsilon,
                                                 mute=config.agent.mute)
 
-                    # Distilling the subtask agent to target agent
-                    # TODO: For brevity, we use the expert net to sample actions.
-                    # Previous study showed that sampling actions from student
-                    # net gives a better result, we might try it later.
-                    teacher = lesson
-                    student = self.target_agent_id
-                    self.distill_agent_one_lesson(
-                        self.agent_list[teacher],
-                        self.agent_list[student],
-                        self.env_list[teacher],
-                        replayBufferAgent_list[teacher],
-                        0,
-                        mute=config.agent.mute)
-
-                    # Training target agent
-                    student = nAgent - 1
-                    epsilon = epsilons[min(self.agent_list[student].update_steps,
+                    # Training on target task
+                    student = nEnv - 1
+                    epsilon = epsilons[min(agent.update_steps,
                                            config.agent.epsilon_decay_steps-1)]
-                    self.train_agent_one_lesson(self.agent_list[student],
-                                                self.env_list[student],
+                    self.train_agent_one_lesson(agent,
+                                                env_list[student],
                                                 replayBufferAgent_list[student],
                                                 epsilon,
                                                 mute=config.agent.mute)
 
-                elif lesson == nAgent - 1:
-                    # ----Train.----
-                    # Training target agent
-                    student = nAgent - 1
-                    epsilon = epsilons[min(self.agent_list[student].update_steps,
+                elif lesson == nEnv - 1:
+                    # ----Only training on target task.----
+                    student = nEnv - 1
+                    epsilon = epsilons[min(agent.update_steps,
                                            config.agent.epsilon_decay_steps-1)]
-                    self.train_agent_one_lesson(self.agent_list[student],
-                                                self.env_list[student],
+                    self.train_agent_one_lesson(agent,
+                                                env_list[student],
                                                 replayBufferAgent_list[student],
                                                 epsilon,
                                                 mute=config.agent.mute)
@@ -250,11 +223,7 @@ class Trainer():
                     logger.error('Wrong action')
 
                 # ----Update performance matrix.----
-                mask = np.zeros((nAgent, nAgent), dtype=int)
-                student = lesson
-                mask[student, student] = 1
-                mask[nAgent - 1, :] = 1
-                self.update_performance_matrix(performance_matrix, ep, mask)
+                self.update_performance_matrix(performance_matrix, ep)
                 meta_reward = self.get_meta_reward_real_time(
                     performance_matrix, ep)
 
@@ -266,13 +235,11 @@ class Trainer():
                 if ep % config.agent.valid_frequency == 0:
                     logger.info('ep: {}, lesson_prob: {}'\
                                 .format(ep, lesson_prob))
-                    for i in range(nAgent):
-                        logger.info('pm of agent{}: {}'\
-                                    .format(i, performance_matrix[i, :, ep+1]))
+                    logger.info('pm of agent: {}'\
+                                .format(performance_matrix[:, ep+1]))
 
                 # ----Save transition.----
-                meta_state_new = self.get_meta_state(performance_matrix[:, :, ep+1],
-                                                     lesson_prob)
+                meta_state_new = self.get_meta_state(performance_matrix[:, ep+1])
                 transition = {'state': meta_state,
                               'action': meta_action,
                               'reward': meta_reward,
@@ -364,7 +331,7 @@ class Trainer():
             batch = replayBuffer.get_batch(batch_size)
             # NOTE: q value of hybrid agent is used to regularize task
             # agent
-            q_expert = self.agent_list[-1].calc_q_value(batch['state'])
+            q_expert = self.agent.calc_q_value(batch['state'])
             batch['q_expert'] = q_expert
             agent.update(batch, mode='train')
             if agent.update_steps % config.agent.synchronize_frequency == 0:
@@ -412,8 +379,8 @@ class Trainer():
 
     def test(self, load_model, ckpt_num=None):
         config = self.config
-        agent = self.agent_list[self.target_agent_id]
-        env = self.env_list[self.target_agent_id]
+        agent = self.agent
+        env = self.env_list[-1]
 
         agent.initialize_weights()
         agent.load_model(load_model)
@@ -461,51 +428,40 @@ class Trainer():
 
         return total_reward_aver
 
-    def update_performance_matrix(self, performance_matrix, ep, mask):
+    def update_performance_matrix(self, performance_matrix, ep):
         # ----Update performance matrix.----
         #   Using expontional moving average method to update the entries of
         #   performance matrix masked by `mask`, while the other entries
         #   remains unchanged. Each entry represent an agent-task pair
-        nAgent, nEnv = mask.shape
+        nEnv, _ = performance_matrix.shape
         ema_decay = config.meta.ema_decay_state
-        for i in range(nAgent):
-            for j in range(nEnv):
-                if mask[i, j]:
-                    r = self.test_agent(self.agent_list[i],
-                                        self.env_list[j],
-                                        mute=True)
-                    performance_matrix[i, j, ep + 1] =\
-                        performance_matrix[i, j, ep] * ema_decay\
-                        + r * (1 - ema_decay)
-                else:
-                    performance_matrix[i, j, ep + 1] =\
-                        performance_matrix[i, j, ep]
+        for i in range(nEnv):
+            r = self.test_agent(self.agent,
+                                self.env_list[i],
+                                mute=True)
+            performance_matrix[i, ep + 1] =\
+                performance_matrix[i, ep] * ema_decay\
+                + r * (1 - ema_decay)
 
     def calc_lesson_prob(self, lesson_history):
         # ----Update lesson probability.----
         # Update the probability of each lesson in the lastest 50 episodes
         win_size = 20
-        nLesson = self.target_agent_id * 2 + 1
+        nLesson = len(self.env_list)
         s = lesson_history[max(0, len(lesson_history) - win_size) :]
         lesson_prob = np.zeros(nLesson)
         for l in s:
             lesson_prob[l] += 1
         return lesson_prob / max(1, len(s))
 
-    def get_meta_state(self, pm, lp):
-        a = np.diag(pm)
-        a = np.append(a[:-1], pm[-1,:])
-        return a
+    def get_meta_state(self, pm):
+        return pm
 
     def get_meta_reward_final(self, performance_matrix):
         return 0
 
     def get_meta_reward_real_time(self, matrix, ep):
-        old = matrix[:, :, ep]
-        new = matrix[:, :, ep + 1]
-        reward = new[-1, -1] - old[-1, -1]
-        #for i in range(len(self.agent_list) - 1):
-        #    reward += (new[i, i] - old[i, i])
+        reward = matrix[-1, ep + 1] - matrix[-1, ep]
         return reward
 
     def baseline_multi(self):
@@ -513,7 +469,7 @@ class Trainer():
         epsilons = np.linspace(config.agent.epsilon_start,
                                config.agent.epsilon_end,
                                config.agent.epsilon_decay_steps)
-        agent = self.agent_list[-1]
+        agent = self.agent
         agent.hybrid = False
         agent.initialize_weights()
         env = self.env_list[-1]

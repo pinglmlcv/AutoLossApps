@@ -26,7 +26,6 @@ class Parser(object):
         self.meta = self.read_meta()
         self.emulator = self.read_emulator()
 
-
     def read_agent(self):
         agent = Section()
         agent.add('dim_a', self.config.getint('agent', 'dim_a_agent'))
@@ -54,6 +53,7 @@ class Parser(object):
         agent.add('save_frequency', self.config.getint('agent', 'save_frequency_agent'))
         agent.add('mute', self.config.getboolean('agent', 'mute_agent'))
         agent.add('lesson_length', self.config.getint('agent', 'lesson_length'))
+        agent.add('lesson_length_distill', self.config.getint('agent', 'lesson_length_distill'))
         agent.add('alpha_reg', self.config.getfloat('agent', 'alpha_reg_agent'))
         agent.add('beta_reg', self.config.getfloat('agent', 'beta_reg_agent'))
         agent.add('greedy', self.config.getboolean('agent', 'greedy_agent'))
@@ -80,6 +80,7 @@ class Parser(object):
         meta.add('n_parallel_actor', self.config.getint('meta', 'n_parallel_actor'))
         meta.add('entropy_bonus_beta', self.config.getfloat('meta', 'entropy_bonus_beta_meta'))
         meta.add('one_step_td', self.config.getboolean('meta', 'one_step_td'))
+        meta.add('off_policy', self.config.getboolean('meta', 'off_policy_meta'))
         meta.add('warmup_steps', self.config.getint('meta', 'warmup_steps_meta'))
 
         return meta
@@ -90,14 +91,12 @@ class Parser(object):
 
         return emlt
 
-
     def print_config(self):
         for key_sec, sec in self.config.items():
             logger.info('[{}]'.format(key_sec))
             for key, value in sec.items():
                 logger.info('{}:: {}'.format(key, value))
 
-    #######
     @property
     def exp_dir(self):
         return os.path.expanduser(self.config.get('env', 'exp_dir'))
