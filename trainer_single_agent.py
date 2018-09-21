@@ -77,9 +77,10 @@ class Trainer():
         # First task: find the door of the first room
         goal_1 = [(4, 6)]
         init_1 = []
-        for i in range(1,8,1):
-            for j in range(1,6,1):
-                init_1.append((i,j))
+        init_1.append((2, 1))
+        #for i in range(1,8,1):
+        #    for j in range(1,6,1):
+        #        init_1.append((i,j))
         self.env_list.append(three_rooms.Env3Rooms(config,
                                                    optional_goals=goal_1,
                                                    optional_inits=init_1))
@@ -93,9 +94,10 @@ class Trainer():
 
         # Third task: find the target in the last room
         goal_3 = []
-        for i in range(1,8,1):
-            for j in range(14,20,1):
-                goal_3.append((i,j))
+        goal_3.append((7, 18))
+        #for i in range(1,8,1):
+        #    for j in range(14,20,1):
+        #        goal_3.append((i,j))
         init_3 = [(4, 13)]
         self.env_list.append(three_rooms.Env3Rooms(config,
                                                    optional_goals=goal_3,
@@ -114,7 +116,6 @@ class Trainer():
                 self.sess,
                 exp_name='{}/agent'.format(exp_name),
             )
-
 
     def train_meta(self, load_model=None, save_model=False):
         config = self.config
@@ -235,8 +236,9 @@ class Trainer():
                 if ep % config.agent.valid_frequency == 0:
                     logger.info('ep: {}, lesson_prob: {}'\
                                 .format(ep, lesson_prob))
+                    logger.info('pm: {}'.format(performance_matrix[:, ep+1]))
                     logger.info('pm of agent: {}'\
-                                .format(performance_matrix[:, ep+1]))
+                                .format(np.mean(performance_matrix[-1, max(0, ep-10) : ep+1])))
 
                 # ----Save transition.----
                 meta_state_new = self.get_meta_state(performance_matrix[:, ep+1])
