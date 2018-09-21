@@ -400,8 +400,8 @@ class Trainer():
             observation, reward, _ =\
                 env.init_episode(config.emulator.display_flag)
             state = preprocess(observation)
-            #epsilon = 0.05
-            epsilon = 0.0
+            epsilon = 0.05
+            #epsilon = 0.0
             total_reward = 0
             for i in range(config.agent.total_steps_test):
                 action = agent.run_step(state, greedy=config.agent.greedy,
