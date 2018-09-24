@@ -508,7 +508,7 @@ class RNNAttention(Basic_model):
         outputs = self.sess.run(output_feed, input_feed)
         return outputs[0]
 
-    def init_parameters(self):
+    def init_weights(self):
         sess = self.sess
         sess.run(tf.global_variables_initializer())
 

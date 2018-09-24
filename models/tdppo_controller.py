@@ -48,7 +48,6 @@ class BasePPO(Basic_model):
         with tf.variable_scope('critic_loss'):
             critic_reg_loss = tf.reduce_sum([tf.reduce_sum(tf.square(x))
                                               for x in critic_param])
-            #mse_loss = -tf.reduce_mean(adv * value)
             mse_loss = tf.reduce_mean(tf.square(self.target_value - value))
             reg_param = 0.0
             self.critic_loss = mse_loss + reg_param * critic_reg_loss

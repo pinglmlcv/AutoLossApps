@@ -20,6 +20,9 @@ class Config():
                                 for task in self.task_names]
         if self.hostname == 'jungpu4':
             self.model_dir = '/home/haowen/saved/AutoLossApps/saved_models'
+        elif self.hostname == 'Luna-Desktop':
+            self.model_dir = '/media/haowen/AutoLossApps/saved_models'
+
 
         # Data
         self.max_seq_length = 60
@@ -57,6 +60,13 @@ class Config():
         # Decoding
         self.max_decode_step = 70
         self.beam_width = 5
+
+        # Controller
+        self.controller_type = 'Fixed'
+        self.buffer_size = 20000
+
+        # Task
+        self.history_len_task = 10
 
     def print_config(self, logger):
         for key, value in vars(self).items():

@@ -77,13 +77,6 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         row = self.position.row
         col = self.position.col
         self.visit[row, col] += 1
-        target_row, target_col = np.where(layers['$'] == True)
-        distance = np.abs(row - target_row) + np.abs(col, target_col)
-        if distance > 0:
-            reward_shaping_reward = 0.01 / distance
-        else:
-            reward_shaping_reward = 0.01
-        reward_shaping_reward = np.squeeze(reward_shaping_reward)
         # Apply motion commands.
         old_position = self.position
         if actions == 0:    # walk upward?
@@ -97,7 +90,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
         if actions is None:
             actions = -1
         if actions > -1 and actions < 5 and self.position == old_position:
-            the_plot.add_reward(-0.02 + reward_shaping_reward)
+            the_plot.add_reward(-0.02)
             return
 
         # See if we've found the mystery spot.
@@ -106,7 +99,7 @@ class PlayerSprite(prefab_sprites.MazeWalker):
             the_plot.terminate_episode()
             return
         elif actions > -1:
-            the_plot.add_reward(-0.01 + reward_shaping_reward)
+            the_plot.add_reward(-0.01)
 
 class GoalDrape(plab_things.Drape):
     # A `Drape` that marks the goal position.
@@ -173,6 +166,12 @@ class Env3Rooms():
                                                            display=display)
         else:
             observation, reward, discount = self.game.play(action)
+
+        # ----Reward shaping.----
+        #goal_map = observation.layers['$']
+        #print(type(goal_map))
+        #exit()
+
         # ----Terminate when timestep exceeds a limit
         if self.time_steps > self.max_time_steps:
             discount = 0

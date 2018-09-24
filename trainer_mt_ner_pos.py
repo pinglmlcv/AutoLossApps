@@ -15,6 +15,7 @@ import socket
 from time import gmtime, strftime
 import time
 import random
+from collections import deque
 
 from models.s2s import rnn_attention_multi_heads
 from models import controllers
@@ -25,9 +26,15 @@ from utils import data_utils
 from utils.data_utils import prepare_batch
 from utils.data_utils import prepare_train_batch
 from utils import metrics
+from utils import replaybuffer
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 logger = utils.get_logger()
+
+class MyMlpPPO(controllers.MlpPPO):
+    def build_actor_net(self, scope, trainable):
+        pass
+
 
 class Trainer():
     """ A class to wrap training code. """
@@ -51,7 +58,10 @@ class Trainer():
             exp_name=exp_name,
             logger=logger
         )
-        self.controller = controllers.FixedController(config, self.sess)
+        if config.controller_type == 'Fixed':
+            self.controller = controllers.FixedController(config, self.sess)
+        elif config.controller_type == 'MlpPPO':
+            self.controller = MyMlpPPO(config, self.sess)
 
         self.train_datasets = []
         self.valid_datasets = []
@@ -73,7 +83,7 @@ class Trainer():
         start_time = time.time()
         model = self.model
         controller = self.controller
-        model.init_parameters()
+        model.init_weights()
         if load_model:
             model.load_model()
         loss = 0.0
@@ -120,6 +130,93 @@ class Trainer():
             if real_step % config.save_frequency == 0:
                 logger.info('Saving the model...')
                 model.save_model(real_step)
+
+    def train_meta(self, load_model=None, save_model=False):
+        config = self.config
+        controller = self.controller
+        model = self.model
+        keys = ['state', 'next_state', 'reward', 'action', 'target_value']
+        replayBufferMeta = replaybuffer.ReplayBuffer(
+            config.buffer_size, keys=keys)
+        meta_training_history = deque(maxlen=10)
+        epsilons = np.linspace(config.epsilon_start_meta,
+                               config.epsilon_end_meta,
+                               config.epsilon_decay_steps_meta)
+
+        # ----Initialize controller.----
+        controller.initialize_weights()
+        if load_model:
+            controller.load_model(load_model)
+
+        # ----Start meta loop.----
+        for ep_meta in range(config.max_episodes_meta):
+            logger.info('######## meta_episodes {} #########'.format(ep_meta))
+            start_time = time.time()
+            # ----Initialize task model.----
+            model.initialize_weights()
+            model.reset()
+            history_train_loss = []
+            history_train_acc = []
+            history_valid_loss = []
+            history_valid_acc = []
+            history_len_task = config.history_len_task
+            for i in range(len(config.task_names)):
+                history_train_loss.append(deque(maxlen=history_len_task))
+                history_train_acc.append(deque(maxlen=history_len_task))
+                history_valid_loss.append(deque(maxlen=history_len_task))
+                history_valid_acc.append(deque(maxlen=history_len_task))
+
+            meta_state = self.get_meta_state(history_train_loss,
+                                             history_train_acc,
+                                             history_valid_loss,
+                                             history_valid_acc,
+                                             )
+            main_task_count = 0
+            for ep in range(config.max_training_steps):
+                epsilon = epsilons[min(ep, config.meta_epsilon_decay_steps)]
+                meta_action = controller.run_step(meta_state, ep, epsilon)
+                task_to_train = meta_action
+                logger.info('task_to_train: {}'.format(task_to_train))
+                samples = self.train_datasets[task_to_train].next_batch(batch_size)
+                inputs = samples['input']
+                targets = samples['target']
+                inputs, inputs_len, targets, targets_len = prepare_train_batch(
+                    inputs, targets, config.max_seq_length)
+
+                step_loss, step_acc = model.train(task_to_train,
+                                                  inputs, inputs_len,
+                                                  targets, targets_len,
+                                                  return_acc=True)
+                history_train_loss[task_to_train].append(step_loss)
+                history_train_acc[task_to_train].append(step_acc)
+                if step % config.valid_frequency == 0:
+                    for i in range(len(config.task_names)):
+                        valid_loss, valid_acc = self.valid(i)
+                        history_valid_loss[i].append(valid_loss)
+                        history_valid_acc[i].append(valid_acc)
+
+                meta_reward = self.get_meta_reward_real_time(history_train_acc[0])
+                meta_state_new = self.get_meta_state(history_train_loss,
+                                                     history_train_acc,
+                                                     history_valid_loss,
+                                                     history_valid_acc
+                                                     )
+                transition = {'state': meta_state,
+                              'action': meta_action,
+                              'reward': meta_reward,
+                              'next_state': meta_state_new,
+                              'target_value': None}
+                meta_transitions.append(transition)
+                meta_state = meta_state_new
+
+                if self.check_terminate():
+                    break
+
+                pass
+
+
+
+
 
     def valid(self, task_to_eval):
         config = self.config
@@ -175,5 +272,3 @@ if __name__ == '__main__':
     elif argv[2] == 'generate':
         # ----Generating----
         logger.info('GENERATE')
-
-

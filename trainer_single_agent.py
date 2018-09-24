@@ -87,28 +87,17 @@ class Trainer():
 
         # Second task: find the door of the second room
         goal_2 = [(4, 12)]
-        init_2 = [(4, 7)]
+        init_2 = init_1
         self.env_list.append(three_rooms.Env3Rooms(config,
                                                    optional_goals=goal_2,
                                                    optional_inits=init_2))
 
-        # Third task: find the target in the last room
-        goal_3 = []
-        goal_3.append((7, 18))
-        #for i in range(1,8,1):
-        #    for j in range(14,20,1):
-        #        goal_3.append((i,j))
-        init_3 = [(4, 13)]
+        # Target_task: find the path from the first room to the target
+        goal_3 = [(7, 18)]
+        init_3 = init_1
         self.env_list.append(three_rooms.Env3Rooms(config,
                                                    optional_goals=goal_3,
                                                    optional_inits=init_3))
-
-        # Target_task: find the path from the first room to the target
-        goal_4 = goal_3
-        init_4 = init_1
-        self.env_list.append(three_rooms.Env3Rooms(config,
-                                                   optional_goals=goal_4,
-                                                   optional_inits=init_4))
 
         self.agent = \
             gridworld_agent.AgentGridWorld(
@@ -200,15 +189,15 @@ class Trainer():
                                                 epsilon,
                                                 mute=config.agent.mute)
 
-                    # Training on target task
-                    student = nEnv - 1
-                    epsilon = epsilons[min(agent.update_steps,
-                                           config.agent.epsilon_decay_steps-1)]
-                    self.train_agent_one_lesson(agent,
-                                                env_list[student],
-                                                replayBufferAgent_list[student],
-                                                epsilon,
-                                                mute=config.agent.mute)
+                    ## Training on target task
+                    #student = nEnv - 1
+                    #epsilon = epsilons[min(agent.update_steps,
+                    #                       config.agent.epsilon_decay_steps-1)]
+                    #self.train_agent_one_lesson(agent,
+                    #                            env_list[student],
+                    #                            replayBufferAgent_list[student],
+                    #                            epsilon,
+                    #                            mute=config.agent.mute)
 
                 elif lesson == nEnv - 1:
                     # ----Only training on target task.----
@@ -255,6 +244,9 @@ class Trainer():
                     break
 
                 # ----End of an agent episode.----
+
+            # ----Save Trained agent.----
+            self.agent.save_model(0)
 
             reward_decay(meta_transitions, config.meta.gamma)
             meta_reward_final = self.get_meta_reward_final(performance_matrix)
@@ -525,5 +517,9 @@ if __name__ == '__main__':
     elif argv[2] == 'generate':
         logger.info('GENERATE')
         trainer.generate(load_stud)
+    elif argv[2] == 'test_agent':
+        logger.info('TEST_AGENT')
+        load_model = '/media/haowen/AutoLossApps/saved_models/test/agent/'
+        trainer.test(load_model)
 
 

@@ -2,5 +2,4 @@
 *.h5
 *.swp
 log/*
-Data/
 __pycache__
