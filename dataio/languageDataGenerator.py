@@ -355,7 +355,7 @@ def generateNERData():
     subword_seg(subword_de_dict_name, word_test_de, subword_test_de)
 
     # Get ner tag dictionary
-    nertag_id = get_token_id(nertag_id_name, corpus=subword_train_ner)
+    nertag_id = get_token_id(nertag_id_name, corpus=word_train_ner)
     print('ner_tag_dictionary:')
     print(nertag_id)
 
