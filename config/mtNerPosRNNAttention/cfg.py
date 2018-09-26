@@ -37,14 +37,23 @@ class Config():
         self.use_dropout = True
         self.use_residual = True
 
-        self.embedding_size = 128
+        self.embedding_size = 64
 
-        self.encoder_hidden_units = 256
+        self.encoder_hidden_units = 128
         self.encoder_depth = 2
 
-        self.attn_hidden_units = 256
-        self.decoder_hidden_units = 256
-        self.decoder_depth = 2
+        self.attn_hidden_units = 128
+        self.decoder_hidden_units = 128
+        self.decoder_depth = 1
+
+        #self.embedding_size = 128
+
+        #self.encoder_hidden_units = 256
+        #self.encoder_depth = 2
+
+        #self.attn_hidden_units = 256
+        #self.decoder_hidden_units = 256
+        #self.decoder_depth = 2
 
         # Training
         self.max_training_steps = 100000
@@ -72,7 +81,7 @@ class Config():
         self.batch_size_meta = 64
         self.gamma_meta = 0.95
         self.cliprange_meta = 0.2
-        self.sync_frequency_meta = 5
+        self.sync_frequency_meta = 1
         self.dim_s_meta = 12
         self.dim_a_meta = 3
         self.dim_h_meta = 32

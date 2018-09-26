@@ -11,7 +11,7 @@ class FixedController(Basic_model):
         self.init = tf.constant([1])
 
     def run_step(self, state, ep, epsilon=0):
-        return [0]
+        #return [0]
         p = np.array([102736, 23999, 40175])
         p = p / np.sum(p)
         action = np.random.choice(len(p), p=p)

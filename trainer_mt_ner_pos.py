@@ -275,6 +275,8 @@ class Trainer():
                 if no_impr_count > config.endurance:
                     logger.info(best_acc)
                     break
+            if save_model:
+                controller.save_model(ep_meta)
 
     def get_meta_state(self,
                        history_train_loss,
@@ -375,7 +377,7 @@ if __name__ == '__main__':
         # ----Training----
         logger.info('TRAIN')
         trainer = Trainer(config, exp_name=argv[1])
-        trainer.train_meta()
+        trainer.train_meta(save_model=True)
 
     elif argv[2] == 'test':
         ## ----Testing----
