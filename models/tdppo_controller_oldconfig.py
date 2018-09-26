@@ -18,6 +18,7 @@ class BasePPO(Basic_model):
             self.state,
             self.action,
             self.reward,
+            self.next_value,
             self.target_value,
             self.lr
 
@@ -38,8 +39,8 @@ class BasePPO(Basic_model):
         old_pi_wrt_a = tf.gather_nd(params=old_pi, indices=a_indices,
                                     name='old_pi_wrt_a')
 
-        cliprange = self.config.cliprange_meta
-        gamma = self.config.gamma_meta
+        cliprange = self.config.meta.cliprange
+        gamma = self.config.agent.gamma
 
         adv = self.target_value - value
         # NOTE: Stop passing gradient through adv
@@ -51,6 +52,10 @@ class BasePPO(Basic_model):
             reg_param = 0.0
             self.critic_loss = mse_loss + reg_param * critic_reg_loss
 
+        #if self.config.meta.one_step_td:
+        #    adv = self.reward + gamma * self.next_value - value
+        #else:
+        #    adv = self.target_value - value
         adv = self.target_value - value
         # NOTE: Stop passing gradient through adv
         adv = tf.stop_gradient(adv, name='actor_adv_stop_gradient')
@@ -64,7 +69,7 @@ class BasePPO(Basic_model):
             actor_reg_loss = tf.reduce_sum([tf.reduce_sum(tf.square(x))
                                             for x in pi_param])
             pg_loss = -tf.reduce_mean(tf.minimum(pg_losses1, pg_losses2))
-            beta = self.config.entropy_bonus_beta_meta
+            beta = self.config.meta.entropy_bonus_beta
             reg_param = 0.0
             self.actor_loss = pg_loss + beta * entropy_loss +\
                 reg_param * actor_reg_loss
@@ -92,7 +97,7 @@ class BasePPO(Basic_model):
 
     def run_step(self, state, epsilon=0):
         state = [state]
-        dim_a = self.config.dim_a_meta
+        dim_a = self.config.agent.dim_a
         pi = self.sess.run(self.pi, {self.state: state})[0]
         # epsilon-greedy
         #A = np.ones(dim_a, dtype=float) * epsilon / dim_a
@@ -148,8 +153,8 @@ class MlpPPO(BasePPO):
             self._build_graph()
 
     def _build_placeholder(self):
-        config = self.config
-        dim_s = config.dim_s_meta
+        config = self.config.meta
+        dim_s = config.dim_s
         with tf.variable_scope('placeholder'):
             self.state = tf.placeholder(tf.float32,
                                         shape=[None, dim_s],
@@ -158,6 +163,9 @@ class MlpPPO(BasePPO):
                                          name='action')
             self.reward = tf.placeholder(tf.float32, shape=[None],
                                          name='reward')
+            self.next_value = tf.placeholder(tf.float32,
+                                             shape=[None],
+                                             name='next_value')
             self.target_value = tf.placeholder(tf.float32,
                                                shape=[None],
                                                name='target_value')
@@ -165,8 +173,8 @@ class MlpPPO(BasePPO):
 
     def build_actor_net(self, scope, trainable):
         with tf.variable_scope(scope):
-            dim_h = self.config.dim_h_meta
-            dim_a = self.config.dim_a_meta
+            dim_h = self.config.meta.dim_h
+            dim_a = self.config.meta.dim_a
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
@@ -189,7 +197,7 @@ class MlpPPO(BasePPO):
 
     def build_critic_net(self, scope):
         with tf.variable_scope(scope):
-            dim_h = self.config.dim_h_meta
+            dim_h = self.config.meta.dim_h
             hidden = tf.contrib.layers.fully_connected(
                 inputs=self.state,
                 num_outputs=dim_h,
@@ -208,7 +216,7 @@ class MlpPPO(BasePPO):
             return value, param
 
     def run_step(self, states, ep, epsilon=0):
-        dim_a = self.config.dim_a_meta
+        dim_a = self.config.meta.dim_a
         if random.random() < epsilon:
             action = random.randint(0, dim_a - 1)
             return action, 'random'

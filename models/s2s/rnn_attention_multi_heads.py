@@ -542,7 +542,7 @@ class RNNAttentionMultiHeads(Basic_model):
             outputs = self.sess.run(output_feed, input_feed)
             return outputs[0], outputs[1]	# loss
 
-    def init_weights(self):
+    def initialize_weights(self):
         sess = self.sess
         sess.run(tf.global_variables_initializer())
 

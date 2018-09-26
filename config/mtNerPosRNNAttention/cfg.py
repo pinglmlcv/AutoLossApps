@@ -4,6 +4,7 @@ root_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__f
 sys.path.insert(0, root_path)
 from utils.config_util import Section
 
+
 class Config():
     def __init__(self):
         self.hostname = socket.gethostname()
@@ -54,8 +55,10 @@ class Config():
         self.keep_prob = 0.7
 
         self.display_frequency = 100
-        self.valid_frequency = 500
+        self.valid_frequency = 100
         self.save_frequency = 500
+        self.history_len_task = 5
+        self.endurance = 10
 
         # Decoding
         self.max_decode_step = 70
@@ -63,7 +66,21 @@ class Config():
 
         # Controller
         self.controller_type = 'Fixed'
-        self.buffer_size = 20000
+        #self.controller_type = 'MlpPPO'
+        self.buffer_size = 200
+        self.lr_meta = 0.001
+        self.batch_size_meta = 64
+        self.gamma_meta = 0.95
+        self.cliprange_meta = 0.2
+        self.sync_frequency_meta = 5
+        self.dim_s_meta = 12
+        self.dim_a_meta = 3
+        self.dim_h_meta = 32
+        self.entropy_bonus_beta_meta = 0.000
+        self.epsilon_start_meta = 0.1
+        self.epsilon_end_meta = 0.1
+        self.epsilon_decay_steps_meta = 50
+        self.max_episodes_meta = 100
 
         # Task
         self.history_len_task = 10

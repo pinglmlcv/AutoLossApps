@@ -107,6 +107,18 @@ class Dataset(object):
     def shuffle(self):
         np.random.shuffle(self._index)
 
+    def resize(self, number, shuffle=False):
+        self._dataset_input = self._dataset_input[:number]
+        self._dataset_target = self._dataset_target[:number]
+        self._num_examples = len(self._dataset_target)
+        self._index = np.arange(self._num_examples)
+        self._index_in_epoch = 0
+        self._epochs_completed = 0
+        if shuffle:
+            self.shuffle()
+
+
+
 
 if __name__ == '__main__':
     filename = os.path.join(root_path, 'Data/toy_16_200/train.npy')
